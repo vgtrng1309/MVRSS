@@ -31,8 +31,9 @@ def test_model():
     else:
         model = TMVANet(n_classes=cfg['nb_classes'], n_frames=cfg['nb_input_channels'])
     print('Number of trainable parameters in the model: %s' % str(count_params(model)))
-    model.load_state_dict(torch.load(model_path))
-    model.cuda()
+    model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
+    if cfg['device'] == 'cuda':
+        model.cuda()
 
     tester = Tester(cfg)
     data = Carrada()
@@ -40,11 +41,19 @@ def test_model():
     testset = SequenceCarradaDataset(test)
     seq_testloader = DataLoader(testset, batch_size=1, shuffle=False, num_workers=0)
     tester.set_annot_type(cfg['annot_type'])
-    if cfg['model'] == 'mvnet':
-        test_results = tester.predict(model, seq_testloader, get_quali=True, add_temp=False)
+    
+    evaluate = False
+    if evaluate:
+        if cfg['model'] == 'mvnet':
+            test_results = tester.predict(model, seq_testloader, get_quali=True, add_temp=False)
+        else:
+            test_results = tester.predict(model, seq_testloader, iteration=True, get_quali=True, add_temp=True)
+        tester.write_params(test_results_path)
     else:
-        test_results = tester.predict(model, seq_testloader, get_quali=True, add_temp=True)
-    tester.write_params(test_results_path)
+        if cfg['model'] == 'mvnet':
+            test_results = tester.predict_nosave(model, seq_testloader, get_quali=True, add_temp=False)
+        else:
+            test_results = tester.predict_nosave(model, seq_testloader, get_quali=False, add_temp=True)
 
 if __name__ == '__main__':
     test_model()

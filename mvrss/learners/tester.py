@@ -2,10 +2,12 @@
 import json
 import numpy as np
 import torch
+import matplotlib.pyplot as plt
+import time
 from torch.utils.data import DataLoader
 from torchvision.utils import make_grid
 
-from mvrss.utils.functions import transform_masks_viz, get_metrics, normalize, define_loss, get_transformations, get_qualitatives
+from mvrss.utils.functions import transform_masks_viz, get_metrics, normalize, define_loss, get_transformations, get_qualitatives, mask_to_img
 from mvrss.utils.paths import Paths
 from mvrss.utils.metrics import Evaluator
 from mvrss.loaders.dataloaders import CarradaDataset
@@ -193,6 +195,92 @@ class Tester:
             ra_metrics.reset()
         return self.test_results
 
+    def predict_nosave(self, net, seq_loader, iteration=None, get_quali=False, add_temp=False):
+        """
+        Method to predict on a given dataset using a fixed model
+
+        PARAMETERS
+        ----------
+        net: PyTorch Model
+            Network to test
+        seq_loader: DataLoader
+            Specific to the dataset used for test
+        iteration: int
+            Iteration used to display visualization
+            Default: None
+        get_quali: boolean
+            If you want to save qualitative results
+            Default: False
+        add_temp: boolean
+            Is the data are considered as a sequence
+            Default: False
+        """
+        net.eval()
+        transformations = get_transformations(self.transform_names, split='test',
+                                              sizes=(self.w_size, self.h_size))
+                                              
+        fig = plt.figure()
+        ax = fig.subplots(2,2)
+        show_ragt = None
+        show_rdgt = None
+        show_rapr = None
+        show_rdpr = None
+        i = 0
+        with torch.no_grad():
+            for i, sequence_data in enumerate(seq_loader):
+                seq_name, seq = sequence_data
+                path_to_frames = self.paths['carrada'] / seq_name[0]
+                frame_dataloader = DataLoader(CarradaDataset(seq,
+                                                             self.annot_type,
+                                                             path_to_frames,
+                                                             self.process_signal,
+                                                             self.n_frames,
+                                                             transformations,
+                                                             add_temp),
+                                              shuffle=False,
+                                              batch_size=self.batch_size,
+                                              num_workers=4)
+                for j, frame in enumerate(frame_dataloader):
+
+                    rd_data = frame['rd_matrix'].to(self.device).float()
+                    ra_data = frame['ra_matrix'].to(self.device).float()
+                    ad_data = frame['ad_matrix'].to(self.device).float()
+                    rd_mask = frame['rd_mask'].to(self.device).float()
+                    ra_mask = frame['ra_mask'].to(self.device).float()
+                    rd_data = normalize(rd_data, 'range_doppler', norm_type=self.norm_type)
+                    ra_data = normalize(ra_data, 'range_angle', norm_type=self.norm_type)
+                    start = time.time()
+                    if self.model == 'tmvanet':
+                        ad_data = normalize(ad_data, 'angle_doppler', norm_type=self.norm_type)
+                        rd_outputs, ra_outputs = net(rd_data, ra_data, ad_data)
+                    else:
+                        rd_outputs, ra_outputs = net(rd_data, ra_data)
+                    end = time.time()
+                    rd_outputs = rd_outputs.to(self.device)
+                    ra_outputs = ra_outputs.to(self.device)
+
+                    rd_outputs = mask_to_img(torch.argmax(rd_outputs, axis=1).cpu().numpy()[0])
+                    rd_mask = mask_to_img(torch.argmax(rd_mask, axis=1).cpu().numpy()[0])
+                    ra_outputs = mask_to_img(torch.argmax(ra_outputs, axis=1).cpu().numpy()[0])
+                    ra_mask = mask_to_img(torch.argmax(ra_mask, axis=1).cpu().numpy()[0])
+
+                    print("Model processing time: ", end - start)
+                    #"""
+                    if (j == 0):
+                        show_ragt = ax[0][0].imshow(ra_mask)
+                        show_rdgt = ax[0][1].imshow(rd_mask)
+                        show_rapr = ax[1][0].imshow(ra_outputs)
+                        show_rdpr = ax[1][1].imshow(rd_outputs)
+                    else:
+                        show_ragt.set_data(ra_mask)
+                        show_rdgt.set_data(rd_mask)
+                        show_rapr.set_data(ra_outputs)
+                        show_rdpr.set_data(rd_outputs)
+                    i += 1
+                    plt.draw()
+                    plt.pause(0.001)
+                    #"""
+        return
     def write_params(self, path):
         """Write quantitative results of the Test"""
         with open(path, 'w') as fp:
