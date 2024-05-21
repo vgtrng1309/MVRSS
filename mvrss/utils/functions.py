@@ -248,11 +248,44 @@ def get_qualitatives(outputs, masks, paths, seq_name, quali_iter, signal_type=No
     masks = torch.argmax(masks, axis=1).cpu().numpy()
     for i in range(outputs.shape[0]):
         mask_img = mask_to_img(masks[i])
-        mask_path = folder_path / 'mask_{}.png'.format(quali_iter)
+        mask_path = folder_path / 'mask_{}.png'.format(str(quali_iter).zfill(4))
         mask_img.save(mask_path)
         output_img = mask_to_img(outputs[i])
-        output_path = folder_path / 'output_{}.png'.format(quali_iter)
+        output_path = folder_path / 'output_{}.png'.format(str(quali_iter).zfill(4))
         output_img.save(output_path)
+        quali_iter += 1
+    return quali_iter
+
+def get_non_img_qualitatives(outputs, masks, paths, seq_name, quali_iter, signal_type=None):
+    """
+    Method to get qualitative results
+
+    PARAMETERS
+    ----------
+    outputs: torch tensor
+        Predicted masks
+    masks: torch tensor
+        Ground truth masks
+    paths: dict
+    seq_name: str
+    quali_iter: int
+        Current iteration on the dataset
+    signal_type: str
+
+    RETURNS
+    -------
+    quali_iter: int
+    """
+    if signal_type:
+        folder_path = paths['logs'] / signal_type / seq_name[0]
+    else:
+        folder_path = paths['logs'] / seq_name[0]
+    folder_path.mkdir(parents=True, exist_ok=True)
+    outputs = outputs.cpu().numpy()
+    for i in range(outputs.shape[0]):
+        output_path = folder_path / 'output_{}.npy'.format(str(quali_iter).zfill(4))
+        with open(output_path, "wb") as f:
+            np.save(f, outputs[i])
         quali_iter += 1
     return quali_iter
 

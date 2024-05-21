@@ -7,7 +7,7 @@ import time
 from torch.utils.data import DataLoader
 from torchvision.utils import make_grid
 
-from mvrss.utils.functions import transform_masks_viz, get_metrics, normalize, define_loss, get_transformations, get_qualitatives, mask_to_img
+from mvrss.utils.functions import transform_masks_viz, get_metrics, normalize, define_loss, get_transformations, get_qualitatives, mask_to_img, get_non_img_qualitatives
 from mvrss.utils.paths import Paths
 from mvrss.utils.metrics import Evaluator
 from mvrss.loaders.dataloaders import CarradaDataset
@@ -93,7 +93,7 @@ class Tester:
                                                              add_temp),
                                               shuffle=False,
                                               batch_size=self.batch_size,
-                                              num_workers=4)
+                                              num_workers=6)
                 if iteration and i == rand_seq:
                     rand_frame = np.random.randint(len(frame_dataloader))
                 if get_quali:
@@ -116,9 +116,9 @@ class Tester:
                     ra_outputs = ra_outputs.to(self.device)
 
                     if get_quali:
-                        quali_iter_rd = get_qualitatives(rd_outputs, rd_mask, self.paths,
+                        quali_iter_rd = get_non_img_qualitatives(rd_outputs, rd_mask, self.paths,
                                                          seq_name, quali_iter_rd, 'range_doppler')
-                        quali_iter_ra = get_qualitatives(ra_outputs, ra_mask, self.paths,
+                        quali_iter_ra = get_non_img_qualitatives(ra_outputs, ra_mask, self.paths,
                                                          seq_name, quali_iter_ra, 'range_angle')
 
                     rd_metrics.add_batch(torch.argmax(rd_mask, axis=1).cpu(),

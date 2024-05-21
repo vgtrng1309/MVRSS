@@ -37,17 +37,21 @@ def test_model():
 
     tester = Tester(cfg)
     data = Carrada()
+    seq_name = "2020-02-28-13-06-53"
     test = data.get('Test')
+    tmp = test[seq_name]
+    test.clear()
+    test[seq_name] = tmp
     testset = SequenceCarradaDataset(test)
     seq_testloader = DataLoader(testset, batch_size=1, shuffle=False, num_workers=0)
     tester.set_annot_type(cfg['annot_type'])
     
-    evaluate = False
+    evaluate = True
     if evaluate:
         if cfg['model'] == 'mvnet':
             test_results = tester.predict(model, seq_testloader, get_quali=True, add_temp=False)
         else:
-            test_results = tester.predict(model, seq_testloader, iteration=True, get_quali=True, add_temp=True)
+            test_results = tester.predict(model, seq_testloader, get_quali=True, add_temp=True)
         tester.write_params(test_results_path)
     else:
         if cfg['model'] == 'mvnet':
