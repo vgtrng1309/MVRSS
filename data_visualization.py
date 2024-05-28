@@ -45,7 +45,7 @@ img_folder = "camera_images"
 anno_folder = "annotations/dense"
 
 seq_idx = 0 #20
-sequences[seq_idx] = "2020-02-28-13-10-51" #"2019-09-16-13-18-33"
+sequences[seq_idx] =  "2020-02-28-13-10-51" #"2019-09-16-13-18-33"
 ra_list = os.listdir(os.path.join(data_dir,sequences[seq_idx],ra_folder))
 ra_list.sort()
 
@@ -96,6 +96,13 @@ if is_show_mask:
     ax2_d = fig2_d.subplots(1,3)
     show_masks_d = [None] * 3
 
+is_show_mask_img = True
+if is_show_mask_img:
+    fig2 = plt.figure()
+    fig2.tight_layout()
+    ax2 = fig2.subplots(1,3)
+    show_masks = [None]*3
+
 fig3 = plt.figure()
 ax3 = fig3.subplots()
 show_img3 = None
@@ -122,38 +129,48 @@ while j < 10:
 
             # Load range-angle output mask
             ram = np.load(rapn)
-            ram_img = np.argmax(ram, axis=0)
+            ram_cls = np.argmax(ram, axis=0)
             ram = ram[1:,:,:]
 
-            if is_show_mask:
-                for l in range(ram.shape[0]):
-                    print(np.min(ram[l]), end=" ")
-                    print(np.max(ram[l]), end=" ")
-                print()
+            for l in range(ram.shape[0]):
+                print(np.min(ram[l]), end=" ")
+                print(np.max(ram[l]), end=" ")
+            print()
 
-                # Load range-doppler output mask
-                rdm = np.load(rdpn)[1:,:,:]
-                for l in range(rdm.shape[0]):
-                    rdm[l] = np.flip(rdm[l], 0)
-                    rdm[l] = np.flip(rdm[l], 1)
-                    print(np.min(rdm[l]), end=" ")
-                    print(np.max(rdm[l]), end=" ")
-                print("\n")
+            # Load range-doppler output mask
+            rdm = np.load(rdpn)
+            for l in range(rdm.shape[0]):
+                rdm[l] = np.flip(rdm[l], 0)
+                rdm[l] = np.flip(rdm[l], 1)
+                print(np.min(rdm[l]), end=" ")
+                print(np.max(rdm[l]), end=" ")
+            print("\n")
+            rdm_cls = np.argmax(rdm, axis=0)
+            rdm = rdm[1:,:,:]
+            
+            ram_img = np.zeros((ram_cls.shape[0],ram_cls.shape[1],3), dtype=np.uint8)
+            ram_img[ram_cls==1] = [255,0,0]
+            ram_img[ram_cls==2] = [0,255,0]
+            ram_img[ram_cls==3] = [0,0,255]
 
-            obj_points = np.transpose(np.array(np.nonzero(ram_img)))
-            for obj_point in obj_points:
-                # print(obj_point)
-                ra = R_axis[obj_point[0]]
-                an = A_axis[obj_point[1]] * np.pi / 180.0
-                # print(ra, an)
-                xm = ra * np.sin(an)
-                ym = ra * np.cos(an)
-                zm = 0.0
-                xc, yc, zc = cam.worldToCam(xm, ym, zm)
-                # print(xc, yc, zc, xm, ym, zm)
-                # print(ram_img[obj_point[0], obj_point[1]])
-                # img[v, u] = COLOR_CODE[ram_img[obj_point[0], obj_point[1]]]
-            # exit(0)
+            rdm_img = np.zeros((rdm_cls.shape[0],rdm_cls.shape[1],3), dtype=np.uint8)
+            rdm_img[rdm_cls==1] = [255,0,0]
+            rdm_img[rdm_cls==2] = [0,255,0]
+            rdm_img[rdm_cls==3] = [0,0,255]
+
+            # obj_points = np.transpose(np.array(np.nonzero(ram_cls)))
+            # for obj_point in obj_points:
+            #     # print(obj_point)
+            #     ra = R_axis[obj_point[0]]
+            #     an = A_axis[obj_point[1]] * np.pi / 180.0
+            #     # print(ra, an)
+            #     xm = ra * np.sin(an)
+            #     ym = ra * np.cos(an)
+            #     zm = 0.0
+            #     xc, yc, zc = cam.worldToCam(xm, ym, zm)
+            #     # print(xc, yc, zc, xm, ym, zm)
+            #     # print(ram_img[obj_point[0], obj_point[1]])
+            #     # img[v, u] = COLOR_CODE[ram_img[obj_point[0], obj_point[1]]]
 
             # plot contour
             if (i == 0 and j == 0):
@@ -191,6 +208,27 @@ while j < 10:
                         ax2_a[k].set_ylabel("Range (m)")
                         ax2_d[k].set_xlabel("Doppler (m/s)")
                         ax2_d[k].set_ylabel("Range (m)")
+                    ax2_a[0].set_title("Pedestrian mask")
+                    ax2_d[0].set_title("Pedestrian mask")
+                    ax2_a[1].set_title("Cyclist mask")
+                    ax2_d[1].set_title("Cyclist mask")
+                    ax2_a[2].set_title("Car mask")
+                    ax2_d[2].set_title("Car mask")
+                
+                if is_show_mask_img:
+                    fig2.suptitle("Rangle-Angle-Doppler segmentation output")
+                    show_masks[0] = ax2[0].imshow(ram_img, extent=[-90., 90., 0., 50.], aspect="auto")
+                    show_masks[1] = ax2[1].imshow(rdm_img, extent=[-13., 13., 0., 50.], aspect="auto")
+                    # ax2[0].set_xticks(np.arange(1,11),labels=np.linspace(-90.0, 90.0, 10))
+                    # ax2[0].set_ylim(0.0, 50.0)
+                    ax2[0].set_xlabel("Angle (degree)")
+                    ax2[0].set_ylabel("Range (m)")
+                    # ax2[0].set_xlim(-13.0, 13.0)
+                    # ax2[0].set_ylim(0.0, 50.0)
+                    ax2[1].set_xlabel("Doppler (m/s)")
+                    ax2[1].set_ylabel("Range (m)")
+                    show_masks[2] = ax2[2].imshow(img)
+
             else:
                 show_ra.set_array(raf.ravel())
                 show_rd.set_array(rdf.ravel())
@@ -204,7 +242,13 @@ while j < 10:
                     for k in range(3):
                         show_masks_a[k].set_array(ram[k].ravel())
                         show_masks_d[k].set_array(rdm[k].ravel())
-        except:
+                if is_show_mask_img:
+                    show_masks[0].set_data(ram_img)
+                    show_masks[1].set_data(rdm_img)
+                    show_masks[2].set_data(img)
+
+        except Exception as e:
+            print("Exception ", e)
             continue
 
         plt.draw()
