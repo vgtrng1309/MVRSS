@@ -1,0 +1,53 @@
+{
+    "pedestrian":
+    {
+        "range_angle":
+        {
+            "iou": [],
+            "centroid_distance": [],
+            "FN": [],
+            "FP": []
+        },
+        "range_doppler":
+        {
+            "iou": [],
+            "centroid_distance": [],
+            "FN": [],
+            "FP": []
+        }
+    },
+    "cyclist":
+    {
+        "range_angle":
+        {
+            "iou": [],
+            "centroid_distance": [],
+            "FN": [],
+            "FP": []
+        },
+        "range_doppler":
+        {
+            "iou": [],
+            "centroid_distance": [],
+            "FN": [],
+            "FP": []
+        }
+    },
+    "car":
+    {
+        "range_angle":
+        {
+            "iou": [],
+            "centroid_distance": [],
+            "FN": [],
+            "FP": []
+        },
+        "range_doppler":
+        {
+            "iou": [],
+            "centroid_distance": [],
+            "FN": [],
+            "FP": []
+        }
+    }
+}
