@@ -6,14 +6,16 @@
             "iou": [],
             "centroid_distance": [],
             "FN": [],
-            "FP": []
+            "FP": [],
+            "appearance": []
         },
         "range_doppler":
         {
             "iou": [],
             "centroid_distance": [],
             "FN": [],
-            "FP": []
+            "FP": [],
+            "appearance": []
         }
     },
     "cyclist":
@@ -23,14 +25,16 @@
             "iou": [],
             "centroid_distance": [],
             "FN": [],
-            "FP": []
+            "FP": [],
+            "appearance": []
         },
         "range_doppler":
         {
             "iou": [],
             "centroid_distance": [],
             "FN": [],
-            "FP": []
+            "FP": [],
+            "appearance": []
         }
     },
     "car":
@@ -40,14 +44,16 @@
             "iou": [],
             "centroid_distance": [],
             "FN": [],
-            "FP": []
+            "FP": [],
+            "appearance": []
         },
         "range_doppler":
         {
             "iou": [],
             "centroid_distance": [],
             "FN": [],
-            "FP": []
+            "FP": [],
+            "appearance": []
         }
     }
 }
