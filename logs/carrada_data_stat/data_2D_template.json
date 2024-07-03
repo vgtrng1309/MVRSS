@@ -1,0 +1,41 @@
+{
+    "pedestrian":
+    {
+        "range_angle":
+        {
+            "power": [],
+            "area" : []
+        },
+        "range_doppler":
+        {
+            "power": [],
+            "area" : []
+        }
+    },
+    "cyclist":
+    {
+        "range_angle":
+        {
+            "power": [],
+            "area" : []
+        },
+        "range_doppler":
+        {
+            "power": [],
+            "area" : []
+        }
+    },
+    "car":
+    {
+        "range_angle":
+        {
+            "power": [],
+            "area" : []
+        },
+        "range_doppler":
+        {
+            "power": [],
+            "area" : []
+        }
+    }
+}

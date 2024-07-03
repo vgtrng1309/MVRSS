@@ -24,7 +24,7 @@ COLOR_CODE = np.array([[0, 0, 0],
                        [255, 0, 0],
                        [0, 255, 0],
                        [0, 0, 255]])
-GRID_SIZE = 10
+GRID_SIZE = 13
 
 def load_frame(path, index):
     try:
@@ -36,13 +36,14 @@ def load_frame(path, index):
         return None, None
     return mask, output
 
-def load_data_frame(path, index):
+def load_data_frame(path, index, is_processed=True):
+    data_type = "_processed/" if is_processed else "_raw/"
     ra_data, rd_data, ra_mask, rd_mask = None, None, None, None
     # Load RA frame
-    with open(path + "range_angle_processed/" + str(index) + ".npy", "rb") as f:
+    with open(path + "range_angle" + data_type + str(index) + ".npy", "rb") as f:
         ra_data = np.load(f)
     # Load RD frame
-    with open(path + "range_doppler_processed/" + str(index) + ".npy", "rb") as f:
+    with open(path + "range_doppler" + data_type + str(index) + ".npy", "rb") as f:
         rd_data = np.load(f)
     # Load RA mask
     with open(path + "annotations/dense/" + str(index) + "/range_angle.npy", "rb") as f:
@@ -127,18 +128,47 @@ def load_result_template(path="./result_template.json"):
         template = json.load(f)
     return template
 
-def get_bin_index(box_center, is_range_angle):
-    range_pix_res = 256 / GRID_SIZE
-    angle_pix_res = 256 / GRID_SIZE
-    doppler_pix_res = 64 / GRID_SIZE
+def get_bin_index(box_center, is_range_angle, grid_size):
+    range_pix_res = 256 / grid_size
+    angle_pix_res = 256 / grid_size
+    doppler_pix_res = 64 / grid_size
     i, j = -1, -1
     if (is_range_angle):
         i = box_center[0] // range_pix_res
         j = box_center[1] // angle_pix_res
     else:
-        i = GRID_SIZE - 1 - box_center[0] // range_pix_res
-        j = GRID_SIZE - 1 - box_center[1] // doppler_pix_res
+        i = grid_size - 1 - box_center[0] // range_pix_res
+        j = grid_size - 1 - box_center[1] // doppler_pix_res
     return int(i), int(j)
 
 def create_2D_list(grid_size):
     return [[np.nan for i in range(grid_size)] for j in range(grid_size)]
+
+def pixel_to_actual(value, axis="range"):
+    if (axis == "range"):
+        return value*RANGE_RES
+    elif (axis == "doppler"):
+        return (value - MAX_DOPPLE_PIX // 2) * DOPPLER_RES
+    else:
+        return (value - MAX_ANGLE_PIX // 2) * ANGLE_RES
+    
+def CFAR_2D(data_mat, gc, tc, far=1e-3):
+    h, w = data_mat.shape
+    train_cell = (gc+tc+1)**2 - (tc+1)**2
+    alpha = train_cell*(far**(-1/train_cell) - 1) # threshold factor
+    res_mat = np.zeros(data_mat.shape)
+
+    for i in range(gc+tc+1, h-gc-tc):
+        for j in range(gc+tc+1, w-gc-tc):
+            cut = data_mat[i,j]
+            mask = np.zeros(shape=data_mat.shape)
+            mask[i-gc-tc:i+gc+tc, j-gc-tc:j+gc+tc] = 1.0
+            mask[i-gc:i+gc, j-gc:j+gc] = 0.0
+
+            noise_estimate = np.mean(data_mat * mask)
+            threshold = alpha * noise_estimate
+
+            if cut > threshold:
+                res_mat[i,j] = data_mat[i,j]
+    
+    return res_mat
