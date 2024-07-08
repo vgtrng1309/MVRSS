@@ -1,6 +1,7 @@
 import numpy as np
 import json
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 from utils_for_investigate import *
 from sklearn import metrics
 
@@ -37,7 +38,7 @@ for cls in classes:
 
             power_data = data_stat[cls][view]["power"]
             area_data = data_stat[cls][view]["area"]
-            mean_power = [[0 for i in range(grid_size)] for j in range(grid_size)]  
+            mean_power = np.asarray([np.asarray([0 for i in range(grid_size)]) for j in range(grid_size)])
             std_power = [[0 for i in range(grid_size)] for j in range(grid_size)]
             for i in range(len(power_data)):
                 for j in range(len(power_data[i])):
@@ -46,9 +47,25 @@ for cls in classes:
                         mean_power[i][j] = np.nanmean(grid)
                         std_power[i][j] = np.nanstd(grid)
             
+            x_data, y_data = np.meshgrid(np.arange(mean_power.shape[1]),
+                                         np.arange(mean_power.shape[0]))
+            x_data = x_data.flatten()
+            y_data = y_data.flatten()
+            mean_power = mean_power.flatten()
+
+            # im = axes.imshow(mean_power)
+            cmap = cm.get_cmap('jet') # Get desired colormap - you can change this!
+            max_height = np.max(mean_power)   # get range of colorbars so we can normalize
+            min_height = np.min(mean_power)
+            # scale each z to [0,1], and get their rgb values
+            rgba = [cmap((k-min_height)/max_height) for k in mean_power] 
+
             # print(mean_power)
-            axes = figure.add_subplot(111)
-            im = axes.imshow(mean_power)
+            axes = figure.add_subplot(111, projection="3d")
+            axes.bar3d( x_data,
+                        y_data,
+                        np.zeros(len(mean_power)),
+                        1, 1, mean_power, color=rgba)
             axes.set_xticks(np.arange(-.5, viz_grid_size, 1))
             axes.set_yticks(np.arange(-.5, viz_grid_size, 1))
             axes.set_xticklabels(axes_grid[view_list[1]])
@@ -57,7 +74,7 @@ for cls in classes:
             axes.set_xlabel(view_list[1] + "({})".format(units[view_list[1]]))
             axes.set_ylabel("range (m)")
             axes.set_title(cls+"_"+view+"_mean_log_power")
-            figure.colorbar(im)
+            # figure.colorbar(im)
 
             # axes = figure.add_subplot(122)
             # if (use_bar_plot):
