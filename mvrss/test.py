@@ -37,7 +37,10 @@ def test_model():
 
     tester = Tester(cfg)
     data = Carrada()
-    seq_name = "2020-02-28-13-06-53"
+    seq_name = "2019-09-16-13-18-33" # Two cars (summer - forward)
+    # seq_name = "2019-09-16-13-20-20" # Two cars (summer - backward)
+    # seq_name = "2020-02-28-13-06-53" # Cyclist and Car (winter - forward)
+    # seq_name = "2020-02-28-13-10-51"
     test = data.get('Test')
     tmp = test[seq_name]
     test.clear()
@@ -46,7 +49,7 @@ def test_model():
     seq_testloader = DataLoader(testset, batch_size=1, shuffle=False, num_workers=0)
     tester.set_annot_type(cfg['annot_type'])
     
-    evaluate = True
+    evaluate = False
     if evaluate:
         if cfg['model'] == 'mvnet':
             test_results = tester.predict(model, seq_testloader, get_quali=True, add_temp=False)

@@ -5,10 +5,12 @@ from skimage import transform
 from pathlib import Path
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
+from random import randint, random
 
 from mvrss.loaders.dataset import Carrada
 from mvrss.utils.paths import Paths
-
+from data.utils.mappings import confmap2ra
+from data.utils.config import radar_configs
 
 class SequenceCarradaDataset(Dataset):
     """DataLoader class for Carrada sequences"""
@@ -62,7 +64,8 @@ class CarradaDataset(Dataset):
         self.dataset = self.dataset[self.n_frames-1:]  # remove n first frames
         self.path_to_annots = self.path_to_frames / 'annotations' / self.annotation_type
 
-    def transform(self, frame, is_vflip=False, is_hflip=False):
+    def transform(self, frame, is_vflip=False, is_hflip=False, 
+                               trans_range=10, trans_angle=0, view="ra"):
         """
         Method to apply preprocessing / data augmentation functions
 
@@ -81,6 +84,7 @@ class CarradaDataset(Dataset):
         -------
         frame: dict
         """
+        predefined_transforms = [VFlip, HFlip, RangeShift, AngleShift]
         if self.transformations is not None:
             for function in self.transformations:
                 if isinstance(function, VFlip):
@@ -88,12 +92,14 @@ class CarradaDataset(Dataset):
                         frame = function(frame)
                     else:
                         continue
-                if isinstance(function, HFlip):
+                elif isinstance(function, HFlip):
                     if is_hflip:
                         frame = function(frame)
                     else:
                         continue
-                if not isinstance(function, VFlip) and not isinstance(function, HFlip):
+                elif isinstance(function, RangeShift):
+                    frame = function(frame, trans_range, view)
+                else:
                     frame = function(frame)
         return frame
 
@@ -151,7 +157,8 @@ class CarradaDataset(Dataset):
         rd_matrix = np.dstack(rd_matrices)
         rd_matrix = np.rollaxis(rd_matrix, axis=-1)
         rd_frame = {'matrix': rd_matrix, 'mask': rd_mask}
-        rd_frame = self.transform(rd_frame, is_vflip=is_vflip, is_hflip=is_hflip)
+        rd_frame = self.transform(rd_frame, is_vflip=is_vflip, is_hflip=is_hflip,
+                                  trans_range=10, trans_angle=0, view="rd")
         if self.add_temp:
             if isinstance(self.add_temp, bool):
                 rd_frame['matrix'] = np.expand_dims(rd_frame['matrix'], axis=0)
@@ -163,7 +170,8 @@ class CarradaDataset(Dataset):
         ra_matrix = np.dstack(ra_matrices)
         ra_matrix = np.rollaxis(ra_matrix, axis=-1)
         ra_frame = {'matrix': ra_matrix, 'mask': ra_mask}
-        ra_frame = self.transform(ra_frame, is_vflip=is_vflip, is_hflip=is_hflip)
+        ra_frame = self.transform(ra_frame, is_vflip=is_vflip, is_hflip=is_hflip,
+                                  trans_range=10, trans_angle=0, view="ra")
         if self.add_temp:
             if isinstance(self.add_temp, bool):
                 ra_frame['matrix'] = np.expand_dims(ra_frame['matrix'], axis=0)
@@ -176,7 +184,7 @@ class CarradaDataset(Dataset):
         ad_matrix = np.rollaxis(ad_matrix, axis=-1)
         # Fill fake mask just to apply transform
         ad_frame = {'matrix': ad_matrix, 'mask': rd_mask.copy()}
-        ad_frame = self.transform(ad_frame, is_vflip=is_vflip, is_hflip=is_hflip)
+        ad_frame = self.transform(ad_frame, is_vflip=is_vflip, is_hflip=is_hflip, view="ad")
         if self.add_temp:
             if isinstance(self.add_temp, bool):
                 ad_frame['matrix'] = np.expand_dims(ad_frame['matrix'], axis=0)
@@ -275,6 +283,81 @@ class VFlip:
         mask = np.flip(mask, axis=2).copy()
         return {'matrix': matrix, 'mask': mask}
 
+def interpolation(data, size):
+    num_noise_cand = 100
+    shape = data.shape
+    data1 = np.reshape(data, (shape[0], shape[1]*shape[2]))
+    indices = np.argsort(data1, axis=1)
+    # print(indices[0,:10])
+    noise_cand = np.zeros((data.shape[0], num_noise_cand))
+    for i, index in enumerate(indices):
+        noise_cand[i] = data1[i][index[:num_noise_cand]]
+
+    noise = np.zeros((data.shape[0], size[0], size[1]))
+    for i in range(data.shape[0]):
+        noise[i] = np.random.choice(noise_cand[i], size=size)
+    
+    return noise
+
+class RangeShift:
+    """
+    Shifting in range view
+    """
+    def __init__(self):
+        self.Max_trans_rng = 40
+        # self.range_grid = confmap2ra(radar_configs, name='range')
+        self.range_grid = np.linspace(start=0.0, stop=51.2, num=256)
+        print(self.range_grid)
+        self.trans_range = None
+
+    def __call__(self, frame, trans_range, view):
+        if (view == "ad"):
+            return {'matrix': frame['matrix'], 'mask': frame['mask']}
+            
+        matrix, mask = frame['matrix'].copy(), frame['mask'].copy()
+        if trans_range is None:
+            if self.trans_range is None:
+                shift_range = randint(-self.Max_trans_rng, self.Max_trans_rng)
+                self.trans_range = shift_range
+            else:
+                shift_range = self.trans_range
+        else:
+            shift_range = trans_range
+        shape = matrix.shape
+        if (view == "ra"):
+            gene_noise_data = interpolation(matrix, [abs(shift_range), radar_configs["ramap_asize"]])
+        else:
+            gene_noise_data = interpolation(matrix, [abs(shift_range), radar_configs["ramap_vsize"]])        
+
+        if (shift_range > 0):
+            compen_mag = np.divide(self.range_grid[0:shape[1] - shift_range], 
+                                   self.range_grid[shift_range:shape[1]]) ** 2
+        else:
+            compen_mag = np.divide(self.range_grid[shift_range:shape[1]], 
+                                   self.range_grid[0:shape[1] - shift_range]) ** 2
+        
+        if (view == "rd"):
+            compen_mag = compen_mag[::-1]
+        compen_mag = np.reshape(compen_mag, (1, -1, 1))
+
+        # print(gene_noise_data)
+        if ((shift_range > 0 and view == "ra") or (shift_range < 0 and view == "rd")):
+            matrix[:, 0:shape[1] - shift_range, :] = matrix[:, shift_range:shape[1], :] * compen_mag
+            matrix[:, shape[1] - shift_range:shape[1], :] = gene_noise_data
+            mask[:, 0:shape[1] - shift_range, :] = mask[:, shift_range:shape[1], :]
+            mask[:, shape[1]-shift_range:shape[1], :] = np.zeros( mask[:, shape[1]-shift_range:shape[1], :].shape)
+        else:
+            matrix[:, shift_range:shape[1], :] = matrix[:, 0:shape[1] - shift_range, :] * compen_mag
+            matrix[:, 0:shift_range, :] = gene_noise_data
+            mask[:, shift_range:shape[1], :] = mask[:, 0:shape[1] - shift_range, :]
+            mask[:, 0:shift_range, :] = np.zeros(mask[:, 0:shift_range, :].shape)
+
+        return {'matrix': matrix, 'mask': mask}
+
+class AngleShift():
+    def __init__(self):
+        self.Max_trans_agl = 20
+        self.angle_grid = confmap2ra(radar_configs, name='angle') # middle number index 63, 64  
 
 def test_sequence():
     dataset = Carrada().get('Train')

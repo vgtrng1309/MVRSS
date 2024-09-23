@@ -240,8 +240,12 @@ class Tester:
                                               shuffle=False,
                                               batch_size=self.batch_size,
                                               num_workers=4)
-                for j, frame in enumerate(frame_dataloader):
-
+                start_frame = True
+                k = 0
+                for frame in frame_dataloader:
+                    if (k < 50):
+                        k += 1
+                        continue
                     rd_data = frame['rd_matrix'].to(self.device).float()
                     ra_data = frame['ra_matrix'].to(self.device).float()
                     ad_data = frame['ad_matrix'].to(self.device).float()
@@ -249,33 +253,49 @@ class Tester:
                     ra_mask = frame['ra_mask'].to(self.device).float()
                     rd_data = normalize(rd_data, 'range_doppler', norm_type=self.norm_type)
                     ra_data = normalize(ra_data, 'range_angle', norm_type=self.norm_type)
-                    start = time.time()
-                    if self.model == 'tmvanet':
-                        ad_data = normalize(ad_data, 'angle_doppler', norm_type=self.norm_type)
-                        rd_outputs, ra_outputs = net(rd_data, ra_data, ad_data)
-                    else:
-                        rd_outputs, ra_outputs = net(rd_data, ra_data)
-                    end = time.time()
-                    rd_outputs = rd_outputs.to(self.device)
-                    ra_outputs = ra_outputs.to(self.device)
-
-                    rd_outputs = mask_to_img(torch.argmax(rd_outputs, axis=1).cpu().numpy()[0])
                     rd_mask = mask_to_img(torch.argmax(rd_mask, axis=1).cpu().numpy()[0])
-                    ra_outputs = mask_to_img(torch.argmax(ra_outputs, axis=1).cpu().numpy()[0])
                     ra_mask = mask_to_img(torch.argmax(ra_mask, axis=1).cpu().numpy()[0])
 
-                    print("Model processing time: ", end - start)
-                    #"""
-                    if (j == 0):
-                        show_ragt = ax[0][0].imshow(ra_mask)
-                        show_rdgt = ax[0][1].imshow(rd_mask)
-                        show_rapr = ax[1][0].imshow(ra_outputs)
-                        show_rdpr = ax[1][1].imshow(rd_outputs)
+                    show_model_result = True
+                    if (not show_model_result):
+                        if (start_frame):
+                            start_frame = False
+                            show_ragt = ax[0][0].imshow(ra_mask)
+                            show_rdgt = ax[0][1].imshow(rd_mask)
+                            show_rapr = ax[1][0].imshow(ra_data[0,0,0,:,:])
+                            show_rdpr = ax[1][1].imshow(rd_data[0,0,0,:,:])
+                        else:
+                            show_ragt.set_data(ra_mask)
+                            show_rdgt.set_data(rd_mask)
+                            show_rapr.set_data(ra_data[0,0,0,:,:])
+                            show_rdpr.set_data(rd_data[0,0,0,:,:])
                     else:
-                        show_ragt.set_data(ra_mask)
-                        show_rdgt.set_data(rd_mask)
-                        show_rapr.set_data(ra_outputs)
-                        show_rdpr.set_data(rd_outputs)
+                        start = time.time()
+                        if self.model == 'tmvanet':
+                            ad_data = normalize(ad_data, 'angle_doppler', norm_type=self.norm_type)
+                            rd_outputs, ra_outputs = net(rd_data, ra_data, ad_data)
+                        else:
+                            rd_outputs, ra_outputs = net(rd_data, ra_data)
+                        end = time.time()
+                        rd_outputs = rd_outputs.to(self.device)
+                        ra_outputs = ra_outputs.to(self.device)
+
+                        rd_outputs = mask_to_img(torch.argmax(rd_outputs, axis=1).cpu().numpy()[0])
+                        ra_outputs = mask_to_img(torch.argmax(ra_outputs, axis=1).cpu().numpy()[0])
+
+                        print("Model processing time: ", end - start)
+                        #"""
+                        if (start_frame):
+                            start_frame = False
+                            show_ragt = ax[0][0].imshow(ra_mask)
+                            show_rdgt = ax[0][1].imshow(rd_mask)
+                            show_rapr = ax[1][0].imshow(ra_outputs)
+                            show_rdpr = ax[1][1].imshow(rd_outputs)
+                        else:
+                            show_ragt.set_data(ra_mask)
+                            show_rdgt.set_data(rd_mask)
+                            show_rapr.set_data(ra_outputs)
+                            show_rdpr.set_data(rd_outputs)
                     i += 1
                     plt.draw()
                     plt.pause(0.001)

@@ -8,7 +8,7 @@ from PIL import Image
 from mvrss.utils import MVRSS_HOME
 from mvrss.losses.soft_dice import SoftDiceLoss
 from mvrss.losses.coherence import CoherenceLoss
-from mvrss.loaders.dataloaders import Rescale, Flip, HFlip, VFlip
+from mvrss.loaders.dataloaders import Rescale, Flip, HFlip, VFlip, RangeShift, AngleShift
 
 
 def get_class_weights(signal_type):
@@ -205,6 +205,10 @@ def get_transformations(transform_names, split='train', sizes=None):
         transformations.append(VFlip())
     if 'hflip' in transform_names and split == 'train':
         transformations.append(HFlip())
+    if 'range_shift' in transform_names:
+        transformations.append(RangeShift())
+    if 'angle_shift' in transform_names:
+        transformations.append(AngleShift())
     return transformations
 
 
