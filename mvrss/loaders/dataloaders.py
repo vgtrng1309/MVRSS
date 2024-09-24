@@ -98,7 +98,8 @@ class CarradaDataset(Dataset):
                     else:
                         continue
                 elif isinstance(function, RangeShift):
-                    frame = function(frame, trans_range, view)
+                    if (trans_range != 0):
+                        frame = function(frame, trans_range, view)
                 else:
                     frame = function(frame)
         return frame
@@ -153,12 +154,16 @@ class CarradaDataset(Dataset):
             is_hflip = True
         else:
             is_hflip = False
+        if np.random.uniform(0, 1) > 0.5:
+            trans_range=10
+        else:
+            trans_range=0
 
         rd_matrix = np.dstack(rd_matrices)
         rd_matrix = np.rollaxis(rd_matrix, axis=-1)
         rd_frame = {'matrix': rd_matrix, 'mask': rd_mask}
         rd_frame = self.transform(rd_frame, is_vflip=is_vflip, is_hflip=is_hflip,
-                                  trans_range=10, trans_angle=0, view="rd")
+                                  trans_range=trans_range, trans_angle=0, view="rd")
         if self.add_temp:
             if isinstance(self.add_temp, bool):
                 rd_frame['matrix'] = np.expand_dims(rd_frame['matrix'], axis=0)
@@ -171,7 +176,7 @@ class CarradaDataset(Dataset):
         ra_matrix = np.rollaxis(ra_matrix, axis=-1)
         ra_frame = {'matrix': ra_matrix, 'mask': ra_mask}
         ra_frame = self.transform(ra_frame, is_vflip=is_vflip, is_hflip=is_hflip,
-                                  trans_range=10, trans_angle=0, view="ra")
+                                  trans_range=trans_range, trans_angle=0, view="ra")
         if self.add_temp:
             if isinstance(self.add_temp, bool):
                 ra_frame['matrix'] = np.expand_dims(ra_frame['matrix'], axis=0)
