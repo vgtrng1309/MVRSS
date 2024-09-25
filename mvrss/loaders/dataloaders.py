@@ -349,13 +349,25 @@ class RangeShift:
         if ((shift_range > 0 and view == "ra") or (shift_range < 0 and view == "rd")):
             matrix[:, 0:shape[1] - shift_range, :] = matrix[:, shift_range:shape[1], :] * compen_mag
             matrix[:, shape[1] - shift_range:shape[1], :] = gene_noise_data
-            mask[:, 0:shape[1] - shift_range, :] = mask[:, shift_range:shape[1], :]
-            mask[:, shape[1]-shift_range:shape[1], :] = np.zeros( mask[:, shape[1]-shift_range:shape[1], :].shape)
+            
+            # Shift background mask
+            mask[0, 0:shape[1] - shift_range, :] = mask[0, shift_range:shape[1], :]
+            mask[0, shape[1]-shift_range:shape[1], :] = np.ones( mask[0, shape[1]-shift_range:shape[1], :].shape)
+
+            # Shift object mask
+            mask[1:, 0:shape[1] - shift_range, :] = mask[1:, shift_range:shape[1], :]
+            mask[1:, shape[1]-shift_range:shape[1], :] = np.zeros( mask[1:, shape[1]-shift_range:shape[1], :].shape)
         else:
             matrix[:, shift_range:shape[1], :] = matrix[:, 0:shape[1] - shift_range, :] * compen_mag
             matrix[:, 0:shift_range, :] = gene_noise_data
-            mask[:, shift_range:shape[1], :] = mask[:, 0:shape[1] - shift_range, :]
-            mask[:, 0:shift_range, :] = np.zeros(mask[:, 0:shift_range, :].shape)
+
+            # Shift background mask
+            mask[0, shift_range:shape[1], :] = mask[0, 0:shape[1] - shift_range, :]
+            mask[0, 0:shift_range, :] = np.ones(mask[0, 0:shift_range, :].shape)
+
+            # Shift object mask
+            mask[1:, shift_range:shape[1], :] = mask[1:, 0:shape[1] - shift_range, :]
+            mask[1:, 0:shift_range, :] = np.zeros(mask[1:, 0:shift_range, :].shape)
 
         return {'matrix': matrix, 'mask': mask}
 
