@@ -220,7 +220,8 @@ class Tester:
                                               sizes=(self.w_size, self.h_size))
                                               
         fig = plt.figure()
-        ax = fig.subplots(2,2)
+        fig.tight_layout()
+        ax = fig.subplots(2,4)
         show_ragt = None
         show_rdgt = None
         show_rapr = None
@@ -242,7 +243,7 @@ class Tester:
                                               num_workers=4)
                 start_frame = True
                 k = 0
-                for frame in frame_dataloader:
+                for frame, rd, ra in frame_dataloader:
                     if (k < 50):
                         k += 1
                         continue
@@ -251,25 +252,38 @@ class Tester:
                     ad_data = frame['ad_matrix'].to(self.device).float()
                     rd_mask = frame['rd_mask'].to(self.device).float()
                     ra_mask = frame['ra_mask'].to(self.device).float()
+                    rd_data_non_norm = rd_data.clone()
+                    ra_data_non_norm = ra_data.clone()
+                    
+                    # TODO: Change normalization here
+                    # rd_data = normalize(rd_data, 'range_doppler', norm_type=self.norm_type)
+                    # ra_data = normalize(ra_data, 'range_angle', norm_type=self.norm_type)
                     rd_data = normalize(rd_data, 'range_doppler', norm_type=self.norm_type)
                     ra_data = normalize(ra_data, 'range_angle', norm_type=self.norm_type)
                     rd_mask = mask_to_img(torch.argmax(rd_mask, axis=1).cpu().numpy()[0])
                     ra_mask = mask_to_img(torch.argmax(ra_mask, axis=1).cpu().numpy()[0])
 
-                    show_model_result = True
-                    if (not show_model_result):
-                        if (start_frame):
-                            start_frame = False
-                            show_ragt = ax[0][0].imshow(ra_mask)
-                            show_rdgt = ax[0][1].imshow(rd_mask)
-                            show_rapr = ax[1][0].imshow(ra_data[0,0,0,:,:])
-                            show_rdpr = ax[1][1].imshow(rd_data[0,0,0,:,:])
-                        else:
-                            show_ragt.set_data(ra_mask)
-                            show_rdgt.set_data(rd_mask)
-                            show_rapr.set_data(ra_data[0,0,0,:,:])
-                            show_rdpr.set_data(rd_data[0,0,0,:,:])
+                    if (start_frame):
+                        show_raorg = ax[0][0].imshow(ra[0,0,:,:], vmin=0.0, vmax=100000.0)
+                        show_rdorg = ax[1][0].imshow(rd[0,0,:,:], vmin=0.0, vmax=2000000.0)
+                        show_rashift = ax[0][1].imshow(ra_data_non_norm[0,0,0,:,:], vmin=0.0, vmax=100000.0)
+                        show_rdshift = ax[1][1].imshow(rd_data_non_norm[0,0,0,:,:], vmin=0.0, vmax=2000000.0)
+                        show_ragt = ax[0][2].imshow(ra_mask)
+                        show_rdgt = ax[1][2].imshow(rd_mask)
+                        # fig.colorbar(show_raorg, ax=ax[0][0], orientation='vertical')
+                        # fig.colorbar(show_rdorg, ax=ax[1][0], orientation='vertical')
+                        # fig.colorbar(show_rashift, ax=ax[0][1], orientation='vertical')
+                        # fig.colorbar(show_rdshift, ax=ax[1][1], orientation='vertical')
                     else:
+                        show_raorg.set_data(ra[0,0,:,:])
+                        show_rdorg.set_data(rd[0,0,:,:])
+                        show_rashift.set_data(ra_data_non_norm[0,0,0,:,:])
+                        show_rdshift.set_data(rd_data_non_norm[0,0,0,:,:])
+                        show_ragt.set_data(ra_mask)
+                        show_rdgt.set_data(rd_mask)
+                    
+                    show_model_result = False
+                    if (show_model_result):
                         start = time.time()
                         if self.model == 'tmvanet':
                             ad_data = normalize(ad_data, 'angle_doppler', norm_type=self.norm_type)
@@ -286,16 +300,12 @@ class Tester:
                         print("Model processing time: ", end - start)
                         #"""
                         if (start_frame):
-                            start_frame = False
-                            show_ragt = ax[0][0].imshow(ra_mask)
-                            show_rdgt = ax[0][1].imshow(rd_mask)
-                            show_rapr = ax[1][0].imshow(ra_outputs)
-                            show_rdpr = ax[1][1].imshow(rd_outputs)
+                            show_rapr = ax[0][3].imshow(ra_outputs)
+                            show_rdpr = ax[1][3].imshow(rd_outputs)
                         else:
-                            show_ragt.set_data(ra_mask)
-                            show_rdgt.set_data(rd_mask)
                             show_rapr.set_data(ra_outputs)
                             show_rdpr.set_data(rd_outputs)
+                    start_frame = False
                     i += 1
                     plt.draw()
                     plt.pause(0.001)
