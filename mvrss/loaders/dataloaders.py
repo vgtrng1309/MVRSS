@@ -334,7 +334,9 @@ class RangeShift:
         else:
             gene_noise_data = interpolation(matrix, [abs(shift_range), radar_configs["ramap_vsize"]])        
 
-        if (shift_range > 0):
+        is_positive_shift = shift_range > 0
+        shift_range = abs(shift_range)
+        if (is_positive_shift):
             compen_mag = np.divide(self.range_grid[0:shape[1] - shift_range], 
                                    self.range_grid[shift_range:shape[1]]) ** 2
         else:
@@ -346,7 +348,7 @@ class RangeShift:
         compen_mag = np.reshape(compen_mag, (1, -1, 1))
 
         # print(gene_noise_data)
-        if ((shift_range > 0 and view == "ra") or (shift_range < 0 and view == "rd")):
+        if ((is_positive_shift and view == "ra") or ((not is_positive_shift) and view == "rd")):
             matrix[:, 0:shape[1] - shift_range, :] = matrix[:, shift_range:shape[1], :] * compen_mag
             matrix[:, shape[1] - shift_range:shape[1], :] = gene_noise_data
             
