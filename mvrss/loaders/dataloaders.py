@@ -100,6 +100,9 @@ class CarradaDataset(Dataset):
                 elif isinstance(function, RangeShift):
                     if (trans_range != 0):
                         frame = function(frame, trans_range, view)
+                elif isinstance(function, AngleShift):
+                    if (trans_angle != 0):
+                        frame = function(frame, trans_angle, view)
                 else:
                     frame = function(frame)
         return frame
@@ -158,13 +161,19 @@ class CarradaDataset(Dataset):
             trans_range=10
         else:
             trans_range=0
+        if np.random.uniform(0, 1) > 0.5:
+            trans_angle=10
+        else:
+            trans_angle=0
+        # trans_range=0
+        # trans_angle=-30
 
         rd_matrix = np.dstack(rd_matrices)
         rd_matrix = np.rollaxis(rd_matrix, axis=-1)
         rd_frame = {'matrix': rd_matrix, 'mask': rd_mask}
         rd_frame_org = rd_matrix.copy()
         rd_frame = self.transform(rd_frame, is_vflip=is_vflip, is_hflip=is_hflip,
-                                  trans_range=trans_range, trans_angle=0, view="rd")
+                                  trans_range=trans_range, trans_angle=trans_angle, view="rd")
         if self.add_temp:
             if isinstance(self.add_temp, bool):
                 rd_frame['matrix'] = np.expand_dims(rd_frame['matrix'], axis=0)
@@ -178,7 +187,7 @@ class CarradaDataset(Dataset):
         ra_frame = {'matrix': ra_matrix, 'mask': ra_mask}
         ra_frame_org = ra_matrix.copy()
         ra_frame = self.transform(ra_frame, is_vflip=is_vflip, is_hflip=is_hflip,
-                                  trans_range=trans_range, trans_angle=0, view="ra")
+                                  trans_range=trans_range, trans_angle=trans_angle, view="ra")
         if self.add_temp:
             if isinstance(self.add_temp, bool):
                 ra_frame['matrix'] = np.expand_dims(ra_frame['matrix'], axis=0)
@@ -191,7 +200,9 @@ class CarradaDataset(Dataset):
         ad_matrix = np.rollaxis(ad_matrix, axis=-1)
         # Fill fake mask just to apply transform
         ad_frame = {'matrix': ad_matrix, 'mask': rd_mask.copy()}
-        ad_frame = self.transform(ad_frame, is_vflip=is_vflip, is_hflip=is_hflip, view="ad")
+        ad_frame_org = ad_matrix.copy()
+        ad_frame = self.transform(ad_frame, is_vflip=is_vflip, is_hflip=is_hflip, 
+                                  trans_range=trans_range, trans_angle=trans_angle, view="ad")
         if self.add_temp:
             if isinstance(self.add_temp, bool):
                 ad_frame['matrix'] = np.expand_dims(ad_frame['matrix'], axis=0)
@@ -204,7 +215,7 @@ class CarradaDataset(Dataset):
                  'ra_matrix': ra_frame['matrix'], 'ra_mask': ra_frame['mask'],
                  'ad_matrix': ad_frame['matrix']}
 
-        return frame, rd_frame_org, ra_frame_org
+        return frame, rd_frame_org, ra_frame_org, ad_frame_org
 
 
 class Rescale:
@@ -374,6 +385,7 @@ class RangeShift:
 
         return {'matrix': matrix, 'mask': mask}
 
+import matplotlib.pyplot as plt
 class AngleShift():
     """
     GainRatio(a, b) = AngleFactor(a) / AngleFactor(b)
@@ -385,9 +397,23 @@ class AngleShift():
     """
     def __init__(self):
         self.Max_trans_agl = 20
-        self.angle_grid = confmap2ra(radar_configs, name='angle') # middle number index 63, 64
+        self.angle_grid = np.radians(confmap2ra(radar_configs, name='angle')) # middle number index 63, 64
         self.N = 8
         self.angle_factor = self.angle2factor()
+        print(self.angle_grid)
+        print(self.angle_factor)
+
+        # if (True):
+        #     compen_mag = np.divide(self.angle_factor[30:256], 
+        #                            self.angle_factor[0:226])
+        # else:
+        #     compen_mag = np.divide(self.angle_factor[0:shape[2]-shift_angle],
+        #                            self.angle_factor[shift_angle:shape[2]])
+
+        # plt.plot(np.arange(0, self.angle_factor.shape[0], 1), self.angle_factor)
+        # plt.plot(np.arange(0, compen_mag.shape[0], 1), compen_mag)
+        # plt.show()
+
 
     def angle2factor(self):
         angle_0 = np.argwhere(self.angle_grid == 0)
@@ -395,7 +421,11 @@ class AngleShift():
         angle_factor_div[angle_0] = self.N
         angle_factor_den = np.sin(np.pi * np.sin(self.angle_grid) / 2)
         angle_factor_den[angle_0] = 1.0        
-        factor = angle_factor_div / angle_factor_den
+        factor = np.abs(angle_factor_div / angle_factor_den)
+        # threshold = 1.0
+        # floor_factor = np.min(factor[factor > threshold])
+        # print(floor_factor)
+        # factor[factor <= threshold] = floor_factor
         return factor
 
     def __call__(self, frame, trans_angle, view):
@@ -411,42 +441,57 @@ class AngleShift():
                 shift_angle = self.trans_angle
         else:
             shift_angle = trans_angle
-        shape = matrix.shape
 
+        if (view == "ad"):
+            matrix = np.flip(matrix.transpose(0, 2, 1), axis=2)
+            mask = np.flip(mask.transpose(0, 2, 1), axis=2)
+
+        shape = matrix.shape
         if (view == "ra"):
             gene_noise_data = interpolation(matrix, [radar_configs["ramap_rsize"], abs(shift_angle)])
         else:
-            gene_noise_data = interpolation(matrix, [abs(shift_angle), radar_configs["ramap_vsize"]])        
+            gene_noise_data = interpolation(matrix, [radar_configs["ramap_vsize"], abs(shift_angle)])        
 
-        # compen_mag = np.divide(self.angle_factor[], self
+        is_positive_shift = shift_angle > 0
+        shift_angle = abs(shift_angle)
+        if (not is_positive_shift):
+            compen_mag = np.divide(self.angle_factor[shift_angle:shape[2]], 
+                                   self.angle_factor[0:shape[2]-shift_angle])
+        else:
+            compen_mag = np.divide(self.angle_factor[0:shape[2]-shift_angle],
+                                   self.angle_factor[shift_angle:shape[2]])
+
+        # if (view == "rd"):
+        #     compen_mag = compen_mag[::-1]
+        compen_mag = np.reshape(compen_mag, (1, 1, -1))
         
-        if (view == "rd"):
-            compen_mag = compen_mag[::-1]
-        compen_mag = np.reshape(compen_mag, (1, -1, 1))
-
         # print(gene_noise_data)
-        if ((shift_range > 0 and view == "ra") or (shift_range < 0 and view == "rd")):
-            matrix[:, 0:shape[1] - shift_range, :] = matrix[:, shift_range:shape[1], :] * compen_mag
-            matrix[:, shape[1] - shift_range:shape[1], :] = gene_noise_data
+        if (is_positive_shift):
+            matrix[:, :, shift_angle:shape[2]] = matrix[:, :, 0:shape[2]-shift_angle] * compen_mag
+            matrix[:, :, 0:shift_angle] = gene_noise_data
             
             # Shift background mask
-            mask[0, 0:shape[1] - shift_range, :] = mask[0, shift_range:shape[1], :]
-            mask[0, shape[1]-shift_range:shape[1], :] = np.ones( mask[0, shape[1]-shift_range:shape[1], :].shape)
+            mask[0, :, shift_angle:shape[2]] = mask[0, :, 0:shape[2]-shift_angle]
+            mask[0, :, 0:shift_angle] = np.ones( mask[0, :, 0:shift_angle].shape)
 
             # Shift object mask
-            mask[1:, 0:shape[1] - shift_range, :] = mask[1:, shift_range:shape[1], :]
-            mask[1:, shape[1]-shift_range:shape[1], :] = np.zeros( mask[1:, shape[1]-shift_range:shape[1], :].shape)
+            mask[1:, :, shift_angle:shape[2]] = mask[1:, :, 0:shape[2]-shift_angle]
+            mask[1:, :, 0:shift_angle] = np.zeros( mask[1:, :, 0:shift_angle].shape)
         else:
-            matrix[:, shift_range:shape[1], :] = matrix[:, 0:shape[1] - shift_range, :] * compen_mag
-            matrix[:, 0:shift_range, :] = gene_noise_data
+            matrix[:, :, 0:shape[2]-shift_angle] = matrix[:, :, shift_angle:shape[2]] * compen_mag
+            matrix[:, :, shape[2]-shift_angle:shape[2]] = gene_noise_data
 
             # Shift background mask
-            mask[0, shift_range:shape[1], :] = mask[0, 0:shape[1] - shift_range, :]
-            mask[0, 0:shift_range, :] = np.ones(mask[0, 0:shift_range, :].shape)
+            mask[0, :, 0:shape[2]-shift_angle] = mask[0, :, shift_angle:shape[2]]
+            mask[0, :, shape[2]-shift_angle:shape[2]] = np.ones(mask[0, :, shape[2]-shift_angle:shape[2]].shape)
 
             # Shift object mask
-            mask[1:, shift_range:shape[1], :] = mask[1:, 0:shape[1] - shift_range, :]
-            mask[1:, 0:shift_range, :] = np.zeros(mask[1:, 0:shift_range, :].shape)
+            mask[1:, :, 0:shape[2]-shift_angle] = mask[1:, :, shift_angle:shape[2]]
+            mask[1:, :, shape[2]-shift_angle:shape[2]] = np.zeros(mask[1:, :, shape[2]-shift_angle:shape[2]].shape)
+
+        if (view == "ad"):
+            matrix = np.flip(matrix, axis=2).transpose(0, 2, 1)
+            mask = np.flip(mask, axis=2).transpose(0, 2, 1)
 
         return {'matrix': matrix, 'mask': mask}
 
