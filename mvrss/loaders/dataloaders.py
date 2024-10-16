@@ -10,7 +10,7 @@ from random import randint, random
 from mvrss.loaders.dataset import Carrada
 from mvrss.utils.paths import Paths
 from data.utils.mappings import confmap2ra
-from data.utils.config import radar_configs
+from data.utils.config import radar_configs, data_stat
 
 class SequenceCarradaDataset(Dataset):
     """DataLoader class for Carrada sequences"""
@@ -301,7 +301,7 @@ class VFlip:
         return {'matrix': matrix, 'mask': mask}
 
 def interpolation(data, size):
-    num_noise_cand = 100
+    num_noise_cand = 200
     shape = data.shape
     data1 = np.reshape(data, (shape[0], shape[1]*shape[2]))
     indices = np.argsort(data1, axis=1)
@@ -382,6 +382,12 @@ class RangeShift:
             mask[1:, shift_range:shape[1], :] = mask[1:, 0:shape[1] - shift_range, :]
             mask[1:, 0:shift_range, :] = np.zeros(mask[1:, 0:shift_range, :].shape)
 
+        if (view == "ra"):
+            matrix[matrix > data_stat["ra_max_val"]] = data_stat["ra_max_val"]
+            matrix[matrix < data_stat["ra_min_val"]] = data_stat["ra_min_val"]
+        else:
+            matrix[matrix > data_stat["rd_max_val"]] = data_stat["rd_max_val"]
+            matrix[matrix < data_stat["rd_min_val"]] = data_stat["rd_min_val"]
         return {'matrix': matrix, 'mask': mask}
 
 import matplotlib.pyplot as plt
