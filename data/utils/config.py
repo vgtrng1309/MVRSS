@@ -105,7 +105,7 @@ radar_configs = {
     'ramap_asize': 256,             # RAMap angle size
     'ramap_vsize': 64,             # RAMap angle size
     'frame_rate': 10,
-    'crop_num': 0,                  # crop some indices in range domain
+    'crop_num': 5,                  # crop some indices in range domain
     'n_chirps': 64,                # number of chirps in one frame
     'sample_freq': 18.38417777e6,
     'sweep_slope': 55.1525333e12,
@@ -119,6 +119,15 @@ radar_configs = {
     'ra_min': -90,                  # min radar angle (fixed)
     'ra_max': 90,                   # max radar angle (fixed)
     'ramap_folder': 'WIN_HEATMAP',
+}
+
+data_stat = {
+    'ra_max_val': 696440.5570678711,
+    'ra_min_val': 760.1505595445633,
+    'rd_max_val': 10364289.944335938,
+    'rd_min_val': 1054.944586366415,
+    'ad_max_val': 882313.9469604492,
+    'ad_min_val': 7355.122343719006,
 }
 
 semi_loss_err_reg = {
