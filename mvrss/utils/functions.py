@@ -114,6 +114,8 @@ def normalize(data, signal_type, norm_type='local'):
     elif signal_type == 'range_doppler':
         if norm_type == 'tvt':
             file_path = MVRSS_HOME / 'config_files' / 'rd_stats_all.json'
+        elif norm_type == 'tvt_raw':
+            file_path = MVRSS_HOME / 'config_files' / 'rd_stats_raw.json'
         else:
             raise TypeError('Global type {} is not supported'.format(norm_type))
         with open(file_path, 'r') as fp:
@@ -124,6 +126,8 @@ def normalize(data, signal_type, norm_type='local'):
     elif signal_type == 'range_angle':
         if norm_type == 'tvt':
             file_path = MVRSS_HOME / 'config_files' / 'ra_stats_all.json'
+        elif norm_type == 'tvt_raw':
+            file_path = MVRSS_HOME / 'config_files' / 'ra_stats_raw.json'
         else:
             raise TypeError('Global type {} is not supported'.format(norm_type))
         with open(file_path, 'r') as fp:
@@ -134,6 +138,8 @@ def normalize(data, signal_type, norm_type='local'):
     elif signal_type == 'angle_doppler':
         if norm_type == 'tvt':
             file_path = MVRSS_HOME / 'config_files' / 'ad_stats_all.json'
+        elif norm_type == 'tvt_raw':
+            file_path = MVRSS_HOME / 'config_files' / 'ad_stats_raw.json'
         else:
             raise TypeError('Global type {} is not supported'.format(norm_type))
         with open(file_path, 'r') as fp:
