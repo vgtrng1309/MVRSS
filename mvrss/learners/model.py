@@ -108,7 +108,7 @@ class Model(nn.Module):
                                               shuffle=self.is_shuffled,
                                               batch_size=self.batch_size,
                                               num_workers=4)
-                for _, frame in enumerate(frame_dataloader):
+                for frame, _, _, _ in frame_dataloader:
                     rd_data = frame['rd_matrix'].to(self.device).float()
                     ra_data = frame['ra_matrix'].to(self.device).float()
                     ad_data = frame['ad_matrix'].to(self.device).float()
