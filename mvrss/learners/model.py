@@ -101,6 +101,7 @@ class Model(nn.Module):
                                                              self.annot_type,
                                                              path_to_frames,
                                                              self.process_signal,
+                                                             self.norm_type,
                                                              self.n_frames,
                                                              transformations,
                                                              add_temp),
