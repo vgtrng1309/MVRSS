@@ -101,7 +101,8 @@ class Tester:
                 if get_quali:
                     quali_iter_rd = self.n_frames-1
                     quali_iter_ra = self.n_frames-1
-                for j, frame in enumerate(frame_dataloader):
+                j = 0
+                for frame, _, _, _ in frame_dataloader:
                     rd_data = frame['rd_matrix'].to(self.device).float()
                     ra_data = frame['ra_matrix'].to(self.device).float()
                     ad_data = frame['ad_matrix'].to(self.device).float()
@@ -177,6 +178,7 @@ class Tester:
                             self.visualizer.update_multi_img_masks(rd_pred_grid, rd_gt_grid,
                                                                    ra_pred_grid, ra_gt_grid,
                                                                    iteration)
+                    j += 1
             self.test_results = dict()
             self.test_results['range_doppler'] = get_metrics(rd_metrics, np.mean(rd_running_losses),
                                                              [np.mean(sub_loss) for sub_loss
@@ -260,7 +262,7 @@ class Tester:
                                               num_workers=4)
                 start_frame = True
                 k = 0
-                for frame, rd, ra, ad in frame_dataloader:
+                for frame, rd, ra, _ in frame_dataloader:
                     k += 1
                     if (k < 30):
                         continue
