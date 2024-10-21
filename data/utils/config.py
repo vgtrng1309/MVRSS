@@ -121,13 +121,21 @@ radar_configs = {
     'ramap_folder': 'WIN_HEATMAP',
 }
 
-data_stat = {
+data_stat_raw = {
     'ra_max_val': 696440.5570678711,
     'ra_min_val': 760.1505595445633,
     'rd_max_val': 10364289.944335938,
     'rd_min_val': 1054.944586366415,
     'ad_max_val': 882313.9469604492,
     'ad_min_val': 7355.122343719006,
+}
+data_stat_log = {
+    'ra_max_val': 58.428840542286125,
+    'ra_min_val': 28.808996195222445,
+    'rd_max_val': 70.15539554011181,
+    'rd_min_val': 30.23229647816331,
+    'ad_max_val': 59.456231442840696,
+    'ad_min_val': 38.66589901096201,
 }
 
 semi_loss_err_reg = {
