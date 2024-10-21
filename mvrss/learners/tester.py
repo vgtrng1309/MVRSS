@@ -1,4 +1,5 @@
 """Class to test a model"""
+import os
 import json
 import numpy as np
 import torch
@@ -88,6 +89,7 @@ class Tester:
                                                              self.annot_type,
                                                              path_to_frames,
                                                              self.process_signal,
+                                                             self.norm_type,
                                                              self.n_frames,
                                                              transformations,
                                                              add_temp),
@@ -218,23 +220,38 @@ class Tester:
         net.eval()
         transformations = get_transformations(self.transform_names, split='test',
                                               sizes=(self.w_size, self.h_size))
-                                              
-        fig = plt.figure()
-        fig.tight_layout()
-        ax = fig.subplots(2,4)
+
+        fig_sum, ax_sum = plt.subplots(3, 3)
+        fig_sum.tight_layout()
+        show_plot_sum = [[None, None, None],
+                         [None, None, None],
+                         [None, None, None]]
+
+        # fig = plt.figure()
+        # fig.tight_layout()
+        # ax = fig.subplots(2,4)
+        # fig2, ax2 = plt.subplots()
+        # fig2.tight_layout()
         show_ragt = None
         show_rdgt = None
         show_rapr = None
         show_rdpr = None
         i = 0
+
         with torch.no_grad():
             for i, sequence_data in enumerate(seq_loader):
                 seq_name, seq = sequence_data
                 path_to_frames = self.paths['carrada'] / seq_name[0]
+                viz_dir = path_to_frames / "viz"
+                try:
+                    os.makedirs(viz_dir / "compare")
+                except:
+                    print("folder exists")
                 frame_dataloader = DataLoader(CarradaDataset(seq,
                                                              self.annot_type,
                                                              path_to_frames,
                                                              self.process_signal,
+                                                             self.norm_type,
                                                              self.n_frames,
                                                              transformations,
                                                              add_temp),
@@ -243,9 +260,9 @@ class Tester:
                                               num_workers=4)
                 start_frame = True
                 k = 0
-                for frame, rd, ra in frame_dataloader:
-                    if (k < 50):
-                        k += 1
+                for frame, rd, ra, ad in frame_dataloader:
+                    k += 1
+                    if (k < 30):
                         continue
                     rd_data = frame['rd_matrix'].to(self.device).float()
                     ra_data = frame['ra_matrix'].to(self.device).float()
@@ -254,34 +271,79 @@ class Tester:
                     ra_mask = frame['ra_mask'].to(self.device).float()
                     rd_data_non_norm = rd_data.clone()
                     ra_data_non_norm = ra_data.clone()
+                    ad_data_non_norm = ad_data.clone()
                     
                     # TODO: Change normalization here
-                    # rd_data = normalize(rd_data, 'range_doppler', norm_type=self.norm_type)
-                    # ra_data = normalize(ra_data, 'range_angle', norm_type=self.norm_type)
+                    ra_norm = normalize(ra, 'range_angle', norm_type=self.norm_type)
+                    print(torch.max(ra_norm), torch.min(ra_norm))
+                    rd_norm = normalize(rd, 'range_doppler', norm_type=self.norm_type)
+                    ad_norm = normalize(ad, 'angle_doppler', norm_type=self.norm_type)
                     rd_data = normalize(rd_data, 'range_doppler', norm_type=self.norm_type)
                     ra_data = normalize(ra_data, 'range_angle', norm_type=self.norm_type)
+                    print(torch.max(ra_data), torch.min(ra_data))
+                    ad_data = normalize(ad_data, 'angle_doppler', norm_type=self.norm_type)
                     rd_mask = mask_to_img(torch.argmax(rd_mask, axis=1).cpu().numpy()[0])
                     ra_mask = mask_to_img(torch.argmax(ra_mask, axis=1).cpu().numpy()[0])
 
                     if (start_frame):
-                        show_raorg = ax[0][0].imshow(ra[0,0,:,:], vmin=0.0, vmax=100000.0)
-                        show_rdorg = ax[1][0].imshow(rd[0,0,:,:], vmin=0.0, vmax=2000000.0)
-                        show_rashift = ax[0][1].imshow(ra_data_non_norm[0,0,0,:,:], vmin=0.0, vmax=100000.0)
-                        show_rdshift = ax[1][1].imshow(rd_data_non_norm[0,0,0,:,:], vmin=0.0, vmax=2000000.0)
-                        show_ragt = ax[0][2].imshow(ra_mask)
-                        show_rdgt = ax[1][2].imshow(rd_mask)
+                        show_plot_sum[0][0] = ax_sum[0][0].imshow(ra_norm[0,0,:,:], vmin=0.0, vmax=1.0)
+                        show_plot_sum[1][0] = ax_sum[1][0].imshow(rd_norm[0,0,:,:], vmin=0.0, vmax=1.0)
+                        show_plot_sum[2][0] = ax_sum[2][0].imshow(ad_norm[0,0,:,:], vmin=0.0, vmax=1.0)
+                        show_plot_sum[0][1] = ax_sum[0][1].imshow(ra_data[0,0,0,:,:], vmin=0.0, vmax=1.0)
+                        show_plot_sum[1][1] = ax_sum[1][1].imshow(rd_data[0,0,0,:,:], vmin=0.0, vmax=1.0)
+                        show_plot_sum[2][1] = ax_sum[2][1].imshow(ad_data[0,0,0,:,:], vmin=0.0, vmax=1.0)
+                        show_plot_sum[0][2] = ax_sum[0][2].imshow(ra_mask)
+                        show_plot_sum[1][2] = ax_sum[1][2].imshow(rd_mask)
+                        ax_sum[0][0].set_title("RA org data")
+                        ax_sum[1][0].set_title("RD org data")
+                        ax_sum[2][0].set_title("AD org data")
+                        ax_sum[0][1].set_title("RA shifted data")
+                        ax_sum[1][1].set_title("RD shifted data")
+                        ax_sum[2][1].set_title("AD shifted data")
+                        ax_sum[0][2].set_title("RA shifted mask")
+                        ax_sum[1][2].set_title("RD shifted mask")
+
+                        # show_plot = ax[0][3].plot(np.arange(0,256,1),
+                        #                      torch.mean(ra[0,0,:,:],axis=0))
+                        # show_plot1 = ax[1][3].plot(np.arange(0,256,1),
+                        #                      torch.mean(ra_data_non_norm[0,0,0,:,:],axis=0))
+
+                        # show_plot.ylim(0, 100000)
+                        # show_raorg = ax[0][0].imshow(ra[0,0,:,:], vmin=0.0, vmax=50000.0)
+                        # show_rdorg = ax[1][0].imshow(rd[0,0,:,:], vmin=0.0, vmax=100000.0)
+                        # show_rashift = ax[0][1].imshow(ra_data_non_norm[0,0,0,:,:], vmin=0.0, vmax=100000.0)
+                        # show_rdshift = ax[1][1].imshow(rd_data_non_norm[0,0,0,:,:], vmin=0.0, vmax=100000.0)
+                        # show_ragt = ax[0][2].imshow(ra_mask)
+                        # show_rdgt = ax[1][2].imshow(rd_mask)
+                        # show_ad = ax[0][4].imshow(ad_data[0,0,0,:,:])
                         # fig.colorbar(show_raorg, ax=ax[0][0], orientation='vertical')
                         # fig.colorbar(show_rdorg, ax=ax[1][0], orientation='vertical')
                         # fig.colorbar(show_rashift, ax=ax[0][1], orientation='vertical')
                         # fig.colorbar(show_rdshift, ax=ax[1][1], orientation='vertical')
                     else:
-                        show_raorg.set_data(ra[0,0,:,:])
-                        show_rdorg.set_data(rd[0,0,:,:])
-                        show_rashift.set_data(ra_data_non_norm[0,0,0,:,:])
-                        show_rdshift.set_data(rd_data_non_norm[0,0,0,:,:])
-                        show_ragt.set_data(ra_mask)
-                        show_rdgt.set_data(rd_mask)
-                    
+                        show_plot_sum[0][0].set_data(ra_norm[0,0,:,:])
+                        show_plot_sum[1][0].set_data(rd_norm[0,0,:,:])
+                        show_plot_sum[2][0].set_data(ad_norm[0,0,:,:])
+                        show_plot_sum[0][1].set_data(ra_data[0,0,0,:,:])
+                        show_plot_sum[1][1].set_data(rd_data[0,0,0,:,:])
+                        show_plot_sum[2][1].set_data(ad_data[0,0,0,:,:])
+                        show_plot_sum[0][2].set_data(ra_mask)
+                        show_plot_sum[1][2].set_data(rd_mask)
+
+                        # show_plot[-1].set_data(np.arange(0,256,1),
+                        #                    torch.mean(ra[0,0,:,:],axis=0))
+                        # show_plot1[-1].set_data(np.arange(0,256,1),
+                        #                    torch.mean(ra_data_non_norm[0,0,0,:,:],axis=0))
+                        # show_raorg.set_data(ra[0,0,:,:])
+                        # show_rdorg.set_data(rd[0,0,:,:])
+                        # show_rashift.set_data(ra_data_non_norm[0,0,0,:,:])
+                        # show_rdshift.set_data(rd_data_non_norm[0,0,0,:,:])
+                        # show_ragt.set_data(ra_mask)
+                        # show_rdgt.set_data(rd_mask)
+                        # show_ad.set_data(ad_data[0,0,0,:,:])
+
+                    # if (k % 25 == 0):
+                    #     fig_sum.savefig(viz_dir / "compare" / (str(k)+".png"), dpi=750)
                     show_model_result = False
                     if (show_model_result):
                         start = time.time()
@@ -308,7 +370,7 @@ class Tester:
                     start_frame = False
                     i += 1
                     plt.draw()
-                    plt.pause(0.001)
+                    plt.pause(0.0001)
                     #"""
         return
     def write_params(self, path):
