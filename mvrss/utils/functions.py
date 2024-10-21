@@ -116,6 +116,8 @@ def normalize(data, signal_type, norm_type='local'):
             file_path = MVRSS_HOME / 'config_files' / 'rd_stats_all.json'
         elif norm_type == 'tvt_raw':
             file_path = MVRSS_HOME / 'config_files' / 'rd_stats_raw.json'
+        elif norm_type == 'tvt_log':
+            file_path = MVRSS_HOME / 'config_files' / 'rd_stats_log.json'
         else:
             raise TypeError('Global type {} is not supported'.format(norm_type))
         with open(file_path, 'r') as fp:
@@ -128,6 +130,8 @@ def normalize(data, signal_type, norm_type='local'):
             file_path = MVRSS_HOME / 'config_files' / 'ra_stats_all.json'
         elif norm_type == 'tvt_raw':
             file_path = MVRSS_HOME / 'config_files' / 'ra_stats_raw.json'
+        elif norm_type == 'tvt_log':
+            file_path = MVRSS_HOME / 'config_files' / 'ra_stats_log.json'
         else:
             raise TypeError('Global type {} is not supported'.format(norm_type))
         with open(file_path, 'r') as fp:
@@ -140,6 +144,8 @@ def normalize(data, signal_type, norm_type='local'):
             file_path = MVRSS_HOME / 'config_files' / 'ad_stats_all.json'
         elif norm_type == 'tvt_raw':
             file_path = MVRSS_HOME / 'config_files' / 'ad_stats_raw.json'
+        elif norm_type == 'tvt_log':
+            file_path = MVRSS_HOME / 'config_files' / 'ad_stats_log.json'
         else:
             raise TypeError('Global type {} is not supported'.format(norm_type))
         with open(file_path, 'r') as fp:
