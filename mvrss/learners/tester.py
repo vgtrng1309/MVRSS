@@ -32,6 +32,7 @@ class Tester:
         self.visualizer = visualizer
         self.model = self.cfg['model']
         self.nb_classes = self.cfg['nb_classes']
+        self.use_ad = self.cfg['use_ad']
         self.annot_type = self.cfg['annot_type']
         self.process_signal = self.cfg['process_signal']
         self.w_size = self.cfg['w_size']
@@ -79,6 +80,10 @@ class Tester:
         coherence_running_losses = list()
         rd_metrics = Evaluator(num_class=self.nb_classes)
         ra_metrics = Evaluator(num_class=self.nb_classes)
+        total_cumulative_time = 0
+        total_num_frames = 0
+        timer_flag = True
+        
         if iteration:
             rand_seq = np.random.randint(len(seq_loader))
         with torch.no_grad():
@@ -95,7 +100,7 @@ class Tester:
                                                              add_temp),
                                               shuffle=False,
                                               batch_size=self.batch_size,
-                                              num_workers=6)
+                                              num_workers=4)
                 if iteration and i == rand_seq:
                     rand_frame = np.random.randint(len(frame_dataloader))
                 if get_quali:
@@ -110,11 +115,24 @@ class Tester:
                     ra_mask = frame['ra_mask'].to(self.device).float()
                     rd_data = normalize(rd_data, 'range_doppler', norm_type=self.norm_type)
                     ra_data = normalize(ra_data, 'range_angle', norm_type=self.norm_type)
-                    if self.model == 'tmvanet':
+                    if self.use_ad is True:
                         ad_data = normalize(ad_data, 'angle_doppler', norm_type=self.norm_type)
-                        rd_outputs, ra_outputs = net(rd_data, ra_data, ad_data)
-                    else:
+
+                    start_time_dummy = time.time()
+
+                    if self.model == 'mvnet' or self.model == 'radarformer2':
                         rd_outputs, ra_outputs = net(rd_data, ra_data)
+                    else:
+                        rd_outputs, ra_outputs = net(rd_data, ra_data, ad_data) 
+                    end_time_dummy = time.time() - start_time_dummy
+                    total_cumulative_time += end_time_dummy
+                    total_num_frames += 1
+                    
+                    if timer_flag == True:
+                        total_cumulative_time = 0
+                        total_num_frames = 0
+                        timer_flag = False
+
                     rd_outputs = rd_outputs.to(self.device)
                     ra_outputs = ra_outputs.to(self.device)
 
@@ -179,6 +197,8 @@ class Tester:
                                                                    ra_pred_grid, ra_gt_grid,
                                                                    iteration)
                     j += 1
+                print('Total time: ', total_cumulative_time, ' on ', total_num_frames, ' frames')
+
             self.test_results = dict()
             self.test_results['range_doppler'] = get_metrics(rd_metrics, np.mean(rd_running_losses),
                                                              [np.mean(sub_loss) for sub_loss
@@ -197,6 +217,9 @@ class Tester:
 
             rd_metrics.reset()
             ra_metrics.reset()
+            print('Total testing time is: ', total_cumulative_time)
+            print('Total number of frames is: ', total_num_frames)
+            print('Per frame time is: ', total_cumulative_time/total_num_frames)
         return self.test_results
 
     def predict_nosave(self, net, seq_loader, iteration=None, get_quali=False, add_temp=False):
@@ -262,7 +285,7 @@ class Tester:
                                               num_workers=4)
                 start_frame = True
                 k = 0
-                for frame, rd, ra, _ in frame_dataloader:
+                for frame, rd, ra, ad in frame_dataloader:
                     k += 1
                     if (k < 30):
                         continue
@@ -346,7 +369,7 @@ class Tester:
 
                     # if (k % 25 == 0):
                     #     fig_sum.savefig(viz_dir / "compare" / (str(k)+".png"), dpi=750)
-                    show_model_result = False
+                    show_model_result = True
                     if (show_model_result):
                         start = time.time()
                         if self.model == 'tmvanet':

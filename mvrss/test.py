@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 from mvrss.utils.paths import Paths
 from mvrss.utils.functions import count_params
 from mvrss.learners.tester import Tester
-from mvrss.models import TMVANet, MVNet
+from mvrss.models import *
 from mvrss.loaders.dataset import Carrada
 from mvrss.loaders.dataloaders import SequenceCarradaDataset
 
@@ -27,9 +27,19 @@ def test_model():
     test_results_path = path / 'results' / 'test_results.json'
 
     if cfg['model'] == 'mvnet':
-        model = MVNet(n_classes=cfg['nb_classes'], n_frames=cfg['nb_input_channels'])
+        model = MVNet(n_classes=cfg['nb_classes'],
+                    n_frames=cfg['nb_input_channels'])
+    elif cfg['model'] == 'TransRadar':
+        model = TransRad(n_classes = cfg['nb_classes'],
+                      n_frames = cfg['nb_input_channels'],
+                      depth = cfg['depth'],
+                      channels = cfg['channels'],
+                      deform_k = cfg['deform_k'],
+                      )
     else:
-        model = TMVANet(n_classes=cfg['nb_classes'], n_frames=cfg['nb_input_channels'])
+        model = TMVANet(n_classes=cfg['nb_classes'],
+                      n_frames=cfg['nb_input_channels'])
+
     print('Number of trainable parameters in the model: %s' % str(count_params(model)))
     model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
     if cfg['device'] == 'cuda':
@@ -38,9 +48,12 @@ def test_model():
     tester = Tester(cfg)
     data = Carrada()
     seq_name = "2019-09-16-13-18-33" # Two cars (summer - forward)
+    # seq_name = "2019-09-16-13-13-01"
+    # seq_name = "2019-09-16-13-13-01"
     # seq_name = "2019-09-16-13-20-20" # Two cars (summer - backward)
     # seq_name = "2020-02-28-13-06-53" # Cyclist and Car (winter - forward)
     # seq_name = "2020-02-28-13-10-51"
+    # seq_name = "2020-02-28-12-23-30"
     test = data.get('Test')
     tmp = test[seq_name]
     test.clear()

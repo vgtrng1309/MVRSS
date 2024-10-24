@@ -44,10 +44,11 @@ class Initializer:
     def _structure_data(self):
         data = dict()
         dataloaders = self._get_dataloaders()
-        name_exp = (self.cfg['model'] + '_' +
-                    'e' + str(self.cfg['nb_epochs']) + '_' +
-                    'lr' + str(self.cfg['lr']) + '_' +
-                    's' + str(self.cfg['torch_seed']))
+
+        ############################# name change stuff
+
+        
+        name_exp = (self.cfg['model'])
         self.cfg['name_exp'] = name_exp
         folder_path = self.paths['logs'] / self.cfg['dataset'] / self.cfg['model'] / name_exp
 

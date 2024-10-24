@@ -8,7 +8,9 @@ from PIL import Image
 from mvrss.utils import MVRSS_HOME
 from mvrss.losses.soft_dice import SoftDiceLoss
 from mvrss.losses.coherence import CoherenceLoss
+from mvrss.losses.MVLoss import MVLoss
 from mvrss.loaders.dataloaders import Rescale, Flip, HFlip, VFlip, RangeShift, AngleShift
+from mvrss.utils.ClassAgnosticLoss import CALoss
 
 
 def get_class_weights(signal_type):
@@ -161,7 +163,7 @@ def normalize(data, signal_type, norm_type='local'):
     return norm_data
 
 
-def define_loss(signal_type, custom_loss, device):
+def define_loss(signal_type, custom_loss, device, delta = 0.6,  loss_weight = 1., dice_weight = 10., coherence_weight = 5.):
     """
     Method to define the loss to use during training
 
@@ -185,11 +187,17 @@ def define_loss(signal_type, custom_loss, device):
     elif custom_loss == 'wce_w10sdice':
         weights = get_class_weights(signal_type)
         ce_loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
-        loss = [ce_loss, SoftDiceLoss(global_weight=10.)]
+        loss = [ce_loss, SoftDiceLoss(global_weight=dice_weight)]
     elif custom_loss == 'wce_w10sdice_w5col':
         weights = get_class_weights(signal_type)
         ce_loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
-        loss = [ce_loss, SoftDiceLoss(global_weight=10.), CoherenceLoss(global_weight=5.)]
+        loss = [ce_loss, SoftDiceLoss(global_weight=dice_weight), CoherenceLoss(global_weight=coherence_weight)]
+    elif custom_loss == 'CAObjectLoss':
+        weights = get_class_weights(signal_type)
+        ce_loss = CALoss(global_weight=loss_weight, delta= delta, device = device)
+        loss = [ce_loss, SoftDiceLoss(global_weight=dice_weight), MVLoss(global_weight=coherence_weight)]
+    
+
     else:
         loss = nn.CrossEntropyLoss()
     return loss

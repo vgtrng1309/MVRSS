@@ -1,11 +1,12 @@
 """Class to train a PyTorch model"""
 import os
+import time
 import json
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.optim.lr_scheduler import ExponentialLR
+from torch.optim.lr_scheduler import ExponentialLR, StepLR
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 
@@ -26,10 +27,13 @@ class Model(nn.Module):
         Parameters and configurations for training
     """
 
-    def __init__(self, net, data):
+    def __init__(self, net, data, store_checkpoints, checkpoint = None):
         super().__init__()
         self.net = net
+        self.store_checkpoints = store_checkpoints
+        self.checkpoint = checkpoint
         self.cfg = data['cfg']
+        self.use_ad = self.cfg['use_ad']
         self.paths = data['paths']
         self.dataloaders = data['dataloaders']
         self.model_name = self.cfg['model']
@@ -75,9 +79,59 @@ class Model(nn.Module):
         transformations = get_transformations(self.transform_names,
                                               sizes=(self.w_size, self.h_size))
         self._set_seeds()
-        self.net.apply(self._init_weights)
-        rd_criterion = define_loss('range_doppler', self.custom_loss, self.device)
-        ra_criterion = define_loss('range_angle', self.custom_loss, self.device)
+        print(self.cfg)
+        optimizer = optim.Adam(self.net.parameters(), lr=self.lr)
+        print(optimizer)
+
+        if 'scheduler' in self.cfg:
+            if self.cfg['scheduler'] == 'step':
+                scheduler = StepLR(optimizer, step_size=1, gamma=self.cfg['gamma'])
+            else:
+                scheduler = ExponentialLR(optimizer, gamma=0.9)
+        if 'gamma' in self.cfg:
+            scheduler = ExponentialLR(optimizer, gamma=self.cfg['gamma'])
+        else:
+            scheduler = ExponentialLR(optimizer, gamma=0.9)
+        self.net.to(self.device)
+        
+        if self.checkpoint is not None:
+            self.net.load_state_dict(self.checkpoint['model'])
+            optimizer.load_state_dict(self.checkpoint['optimizer'])
+            scheduler.load_state_dict(self.checkpoint['scheduler'])
+            iteration = self.checkpoint['iteration']
+            epoch_start = self.checkpoint['epoch']
+            best_test_miou = self.checkpoint['best_test_miou']
+            best_val_miou = self.checkpoint['best_val_miou']
+            epoch_of_best = self.checkpoint['epoch_of_best']
+            # val_flag = 1
+            del self.checkpoint
+        else:
+            self.net.apply(self._init_weights)
+            iteration = 0
+            best_val_miou = 0
+            epoch_start = 0
+            # val_flag = 0
+            best_test_miou = 0
+            epoch_of_best = 0
+        running_time = 0
+        testing_times = 0
+        # gradual_weight = 1
+        if 'loss_weights' in self.cfg:
+            rd_criterion = define_loss('range_doppler', self.custom_loss, self.device,
+                                        delta = self.cfg['loss_weights'][0],
+                                        loss_weight = self.cfg['loss_weights'][1], 
+                                        dice_weight = self.cfg['loss_weights'][2], 
+                                        coherence_weight = self.cfg['loss_weights'][3])
+            ra_criterion = define_loss('range_angle', self.custom_loss, self.device,
+                                        delta = self.cfg['loss_weights'][0],
+                                        loss_weight = self.cfg['loss_weights'][1], 
+                                        dice_weight = self.cfg['loss_weights'][2], 
+                                        coherence_weight = self.cfg['loss_weights'][3])
+        else:
+            rd_criterion = define_loss('range_doppler', self.custom_loss, self.device)
+            ra_criterion = define_loss('range_angle', self.custom_loss, self.device)
+
+        print('rd criterion: ', rd_criterion, 'ra_criterion', ra_criterion)
         nb_losses = len(rd_criterion)
         running_losses = list()
         rd_running_losses = list()
@@ -85,14 +139,14 @@ class Model(nn.Module):
         ra_running_losses = list()
         ra_running_global_losses = [list(), list()]
         coherence_running_losses = list()
-        optimizer = optim.Adam(self.net.parameters(), lr=self.lr)
-        scheduler = ExponentialLR(optimizer, gamma=0.9)
-        iteration = 0
-        best_val_prec = 0
-        self.net.to(self.device)
-
-        for epoch in range(self.nb_epochs):
-            if epoch % self.lr_step == 0 and epoch != 0:
+        print('model is at: ', self.paths['results'])
+        for epoch in range((self.nb_epochs-epoch_start)):
+            print('model name is:', self.cfg['unique'])
+            print('training:', self.net.training)
+            if self.net.training == False:
+                print('model is set to training ... ')
+                self.net.train()
+            if epoch % self.lr_step == 0 and (epoch+epoch_start) != 0:
                 scheduler.step()
             for _, sequence_data in enumerate(train_loader):
                 seq_name, seq = sequence_data
@@ -116,14 +170,14 @@ class Model(nn.Module):
                     ra_mask = frame['ra_mask'].to(self.device).float()
                     rd_data = normalize(rd_data, 'range_doppler', norm_type=self.norm_type)
                     ra_data = normalize(ra_data, 'range_angle', norm_type=self.norm_type)
-                    if self.model_name == 'tmvanet':
+                    if self.use_ad is True:
                         ad_data = normalize(ad_data, 'angle_doppler', norm_type=self.norm_type)
                     optimizer.zero_grad()
 
-                    if self.model_name == 'tmvanet':
-                        rd_outputs, ra_outputs = self.net(rd_data, ra_data, ad_data)
-                    else:
+                    if self.model_name == 'mvnet':
                         rd_outputs, ra_outputs = self.net(rd_data, ra_data)
+                    else:
+                        rd_outputs, ra_outputs = self.net(rd_data, ra_data, ad_data)
                     rd_outputs = rd_outputs.to(self.device)
                     ra_outputs = ra_outputs.to(self.device)
                     if nb_losses < 3:
@@ -169,7 +223,7 @@ class Model(nn.Module):
                         if nb_losses > 2:
                             coherence_train_loss = np.mean(coherence_running_losses)
                         print('[Epoch {}/{}, iter {}]: '
-                              'train loss {}'.format(epoch+1,
+                              'train loss {}'.format(epoch+epoch_start+1,
                                                      self.nb_epochs,
                                                      iteration,
                                                      train_loss))
@@ -185,58 +239,116 @@ class Model(nn.Module):
                         running_losses = list()
                         rd_running_losses = list()
                         ra_running_losses = list()
-                        self.visualizer.update_learning_rate(scheduler.get_lr()[0], iteration)
+                        self.visualizer.update_learning_rate(scheduler.get_last_lr()[0], iteration)
 
-                    if iteration % self.val_step == 0 and iteration > 0:
-                        if iteration % self.viz_step == 0 and iteration > 0:
-                            val_metrics = self.tester.predict(self.net, val_loader, iteration,
-                                                              add_temp=add_temp)
-                        else:
-                            val_metrics = self.tester.predict(self.net, val_loader, add_temp=add_temp)
-
-                        self.visualizer.update_multi_val_metrics(val_metrics, iteration)
-                        print('[Epoch {}/{}] Validation losses: '
-                              'RD={}, RA={}'.format(epoch+1,
-                                                    self.nb_epochs,
-                                                    val_metrics['range_doppler']['loss'],
-                                                    val_metrics['range_angle']['loss']))
-                        print('[Epoch {}/{}] Validation Pixel Prec: '
-                              'RD={}, RA={}'.format(epoch+1,
-                                                    self.nb_epochs,
-                                                    val_metrics['range_doppler']['prec'],
-                                                    val_metrics['range_angle']['prec']))
-
-                        if val_metrics['global_prec'] > best_val_prec and iteration > 0:
-                            best_val_prec = val_metrics['global_prec']
-                            test_metrics = self.tester.predict(self.net, test_loader,
-                                                               add_temp=add_temp)
-                            print('[Epoch {}/{}] Test losses: '
-                                  'RD={}, RA={}'.format(epoch+1,
-                                                        self.nb_epochs,
-                                                        test_metrics['range_doppler']['loss'],
-                                                        test_metrics['range_angle']['loss']))
-                            print('[Epoch {}/{}] Test Prec: '
-                                  'RD={}, RA={}'.format(epoch+1,
-                                                        self.nb_epochs,
-                                                        test_metrics['range_doppler']['prec'],
-                                                        test_metrics['range_angle']['prec']))
-
-                            self.results['rd_train_loss'] = rd_train_loss.item()
-                            self.results['ra_train_loss'] = ra_train_loss.item()
-                            self.results['train_loss'] = train_loss.item()
-                            self.results['val_metrics'] = val_metrics
-                            self.results['test_metrics'] = test_metrics
-                            if nb_losses > 3:
-                                self.results['coherence_train_loss'] = coherence_train_loss.item()
-                            self._save_results()
-                        self.net.train()  # Train mode after evaluation process
                     iteration += 1
+            if (epoch+epoch_start) % 10 == 0 and (epoch+epoch_start) != 0 :
+
+                print('Current optimizer is:',optimizer)
+                status_dict = {
+                    'epoch': epoch+epoch_start+1,
+                    'model': self.net.state_dict(),
+                    'optimizer': optimizer.state_dict(),
+                    'scheduler': scheduler.state_dict(),
+                    'iteration': iteration,
+                    'best_test_miou': best_test_miou,
+                    'best_val_miou': best_val_miou,
+                    'epoch_of_best': epoch_of_best
+                    
+                }
+                save_model_path = '%s/epoch_%02d_final.pt' % (self.store_checkpoints, epoch+epoch_start + 1)
+                torch.save(status_dict, save_model_path)
+            
+
+            if (epoch+epoch_start+1) % self.val_step == 0 and iteration > 0:
+
+                print('model is at: ', self.paths['results'])
+                print('Current optimizer is:',optimizer)
+                print('Validating ... ')
+
+                start_time = time.time()
+                val_metrics = self.tester.predict(self.net, val_loader, add_temp=add_temp)
+                print('val_time is: ', (time.time() - start_time))
+
+                self.visualizer.update_multi_val_metrics(val_metrics, iteration)
+                print('[Epoch {}/{}] Validation losses: '
+                        'RD={}, RA={}'.format(epoch+epoch_start+1,
+                                            self.nb_epochs,
+                                            val_metrics['range_doppler']['loss'],
+                                            val_metrics['range_angle']['loss']))
+                print('[Epoch {}/{}] Validation Pixel Prec: '
+                        'RD={}, RA={}, RD_miou={}, RA_miou= {}'.format(epoch+epoch_start+1,
+                                            self.nb_epochs,
+                                            val_metrics['range_doppler']['prec'],
+                                            val_metrics['range_angle']['prec'],
+                                            val_metrics['range_doppler']['miou'],
+                                            val_metrics['range_angle']['miou']))
+                
+                print('best val miou',best_val_miou)
+                
+                #original code used val_prec, i am using miou since we switched the loss to miou based loss. 
+                if val_metrics['range_doppler']['miou'] > (best_val_miou):
+                    best_val_miou = val_metrics['range_doppler']['miou']
+                    
+                    start_time = time.time()
+                    test_metrics = self.tester.predict(self.net, test_loader,
+                                                        add_temp=add_temp)
+                    end_time = time.time() - start_time
+                    testing_times = testing_times + 1
+                    print('test_time is: ', end_time)
+                    running_time = running_time + end_time
+
+                    print('avg test_time is: ', (running_time/testing_times))
+                    print('[Epoch {}/{}] Test losses: '
+                            'RD={}, RA={}'.format(epoch+epoch_start+1,
+                                                self.nb_epochs,
+                                                test_metrics['range_doppler']['loss'],
+                                                test_metrics['range_angle']['loss']))
+                    print('[Epoch {}/{}] Test Prec: '
+                            'RD={}, RA={}, RD_miou={}, RA_miou={}'.format(epoch+epoch_start+1,
+                                                self.nb_epochs,
+                                                test_metrics['range_doppler']['prec'],
+                                                test_metrics['range_angle']['prec'],
+                                                test_metrics['range_doppler']['miou'],
+                                                test_metrics['range_angle']['miou']))
+
+                    epoch_of_best = (epoch+epoch_start+1)
+                    best_test_miou = test_metrics['range_doppler']['miou']
+                    self.results['rd_train_loss'] = rd_train_loss.item()
+                    self.results['ra_train_loss'] = ra_train_loss.item()
+                    self.results['train_loss'] = train_loss.item()
+#                    self.results['val_metrics'] = val_metrics
+                    self.results['test_metrics'] = test_metrics
+                    if nb_losses > 3:
+                        self.results['coherence_train_loss'] = coherence_train_loss.item()
+                    self._save_results()
+                    
+                    status_dict = {
+                    'epoch': epoch+epoch_start+1,
+                    'model': self.net.state_dict(),
+                    'optimizer': optimizer.state_dict(),
+                    'scheduler': scheduler.state_dict(),
+                    'iteration': iteration,
+                    'best_test_miou': best_test_miou,
+                    'best_val_miou': best_val_miou,
+                    'epoch_of_best': epoch_of_best
+                }
+                    save_model_path = '%s/max_epoch_%02d_final.pt' % (self.store_checkpoints, epoch+epoch_start + 1)
+                    torch.save(status_dict, save_model_path)
+                    print('saving this checkpoint at', save_model_path)
+
+                    self.net.train()
+                else:
+                    print('Skip testing ...')
+                    self.net.train()  
+
         self.writer.close()
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
             torch.nn.init.xavier_uniform_(m.weight)
-            nn.init.constant_(m.bias, 0.)
+            if m.bias is not None:
+                nn.init.constant_(m.bias, 0.)
         elif isinstance(m, nn.Conv2d):
             torch.nn.init.xavier_uniform_(m.weight)
             if m.bias is not None:

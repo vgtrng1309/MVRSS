@@ -43,7 +43,7 @@ views = ["range", "angle", "doppler"]
 metrics = ["power_level"]
 is_processed = False
 show_frame = True
-use_cfar = False
+use_cfar = True
 skip_frame = 45
 
 for seq in seq_list[5:]:
