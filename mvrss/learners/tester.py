@@ -137,9 +137,9 @@ class Tester:
                     ra_outputs = ra_outputs.to(self.device)
 
                     if get_quali:
-                        quali_iter_rd = get_non_img_qualitatives(rd_outputs, rd_mask, self.paths,
+                        quali_iter_rd = get_qualitatives(rd_outputs, rd_mask, self.paths,
                                                          seq_name, quali_iter_rd, 'range_doppler')
-                        quali_iter_ra = get_non_img_qualitatives(ra_outputs, ra_mask, self.paths,
+                        quali_iter_ra = get_qualitatives(ra_outputs, ra_mask, self.paths,
                                                          seq_name, quali_iter_ra, 'range_angle')
 
                     rd_metrics.add_batch(torch.argmax(rd_mask, axis=1).cpu(),
@@ -252,9 +252,9 @@ class Tester:
                          [None, None, None],
                          [None, None, None]]
 
-        # fig = plt.figure()
-        # fig.tight_layout()
-        # ax = fig.subplots(2,4)
+        fig = plt.figure()
+        fig.tight_layout()
+        ax = fig.subplots(2)
         # fig2, ax2 = plt.subplots()
         # fig2.tight_layout()
         show_ragt = None
@@ -287,7 +287,7 @@ class Tester:
                 k = 0
                 for frame, rd, ra, ad in frame_dataloader:
                     k += 1
-                    if (k < 30):
+                    if (k < 50):
                         continue
                     rd_data = frame['rd_matrix'].to(self.device).float()
                     ra_data = frame['ra_matrix'].to(self.device).float()
@@ -297,15 +297,18 @@ class Tester:
                     rd_data_non_norm = rd_data.clone()
                     ra_data_non_norm = ra_data.clone()
                     ad_data_non_norm = ad_data.clone()
+
+                    # print(torch.max(ra_data), torch.min(ra_data))
+                    # print(torch.max(ad_data), torch.min(ad_data))
                     
                     # TODO: Change normalization here
                     ra_norm = normalize(ra, 'range_angle', norm_type=self.norm_type)
-                    print(torch.max(ra_norm), torch.min(ra_norm))
+                    # print(torch.max(ra_norm), torch.min(ra_norm))
                     rd_norm = normalize(rd, 'range_doppler', norm_type=self.norm_type)
                     ad_norm = normalize(ad, 'angle_doppler', norm_type=self.norm_type)
                     rd_data = normalize(rd_data, 'range_doppler', norm_type=self.norm_type)
                     ra_data = normalize(ra_data, 'range_angle', norm_type=self.norm_type)
-                    print(torch.max(ra_data), torch.min(ra_data))
+                    # print(torch.max(ra_data), torch.min(ra_data))
                     ad_data = normalize(ad_data, 'angle_doppler', norm_type=self.norm_type)
                     rd_mask = mask_to_img(torch.argmax(rd_mask, axis=1).cpu().numpy()[0])
                     ra_mask = mask_to_img(torch.argmax(ra_mask, axis=1).cpu().numpy()[0])
@@ -372,11 +375,17 @@ class Tester:
                     show_model_result = True
                     if (show_model_result):
                         start = time.time()
-                        if self.model == 'tmvanet':
-                            ad_data = normalize(ad_data, 'angle_doppler', norm_type=self.norm_type)
-                            rd_outputs, ra_outputs = net(rd_data, ra_data, ad_data)
-                        else:
+                        # if self.use_ad is True:
+                        #     ad_data = normalize(ad_data, 'angle_doppler', norm_type=self.norm_type)
+                            
+                        if self.model == 'mvnet' or self.model == 'radarformer2':
                             rd_outputs, ra_outputs = net(rd_data, ra_data)
+                        else:
+                            print(torch.max(rd_data), torch.min(rd_data))
+                            print(torch.max(ra_data), torch.min(ra_data))
+                            print(torch.max(ad_data), torch.min(ad_data))
+                            rd_outputs, ra_outputs = net(rd_data, ra_data, ad_data) 
+
                         end = time.time()
                         rd_outputs = rd_outputs.to(self.device)
                         ra_outputs = ra_outputs.to(self.device)
@@ -387,8 +396,8 @@ class Tester:
                         print("Model processing time: ", end - start)
                         #"""
                         if (start_frame):
-                            show_rapr = ax[0][3].imshow(ra_outputs)
-                            show_rdpr = ax[1][3].imshow(rd_outputs)
+                            show_rapr = ax[0].imshow(ra_outputs)
+                            show_rdpr = ax[1].imshow(rd_outputs)
                         else:
                             show_rapr.set_data(ra_outputs)
                             show_rdpr.set_data(rd_outputs)

@@ -41,28 +41,26 @@ def test_model():
                       n_frames=cfg['nb_input_channels'])
 
     print('Number of trainable parameters in the model: %s' % str(count_params(model)))
-    model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
-    if cfg['device'] == 'cuda':
-        model.cuda()
+    model.to(cfg['device'])
+    model.load_state_dict(torch.load(model_path,map_location=cfg['device']))
 
     tester = Tester(cfg)
     data = Carrada()
-    seq_name = "2019-09-16-13-18-33" # Two cars (summer - forward)
-    # seq_name = "2019-09-16-13-13-01"
+    # seq_name = "2019-09-16-13-18-33" # Two cars (summer - forward)
     # seq_name = "2019-09-16-13-13-01"
     # seq_name = "2019-09-16-13-20-20" # Two cars (summer - backward)
     # seq_name = "2020-02-28-13-06-53" # Cyclist and Car (winter - forward)
     # seq_name = "2020-02-28-13-10-51"
     # seq_name = "2020-02-28-12-23-30"
     test = data.get('Test')
-    tmp = test[seq_name]
-    test.clear()
-    test[seq_name] = tmp
+    #tmp = test[seq_name]
+    #test.clear()
+    #test[seq_name] = tmp
     testset = SequenceCarradaDataset(test)
     seq_testloader = DataLoader(testset, batch_size=1, shuffle=False, num_workers=0)
     tester.set_annot_type(cfg['annot_type'])
     
-    evaluate = False
+    evaluate = True
     if evaluate:
         if cfg['model'] == 'mvnet':
             test_results = tester.predict(model, seq_testloader, get_quali=True, add_temp=False)

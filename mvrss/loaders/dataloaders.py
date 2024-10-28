@@ -169,8 +169,8 @@ class CarradaDataset(Dataset):
         if np.random.uniform(0, 1) > 0.5:
             while (trans_angle == 0):
                 trans_angle=np.random.randint(-10,10,1)[0]
-        trans_range=-1
-        trans_angle=-1
+        # trans_range=-1
+        # trans_angle=-1
 
         rd_matrix = np.dstack(rd_matrices)
         rd_matrix = np.rollaxis(rd_matrix, axis=-1)
@@ -225,19 +225,21 @@ class CarradaDataset(Dataset):
             ra_frame['matrix'] = 10.0 * np.log10(ra_frame['matrix'])
             ad_frame['matrix'] = 10.0 * np.log10(ad_frame['matrix'])
         
+        data_stat = None
         if (self.norm_type == "tvt_raw"):
             data_stat = data_stat_raw
         elif (self.norm_type == "tvt_log"):
             data_stat = data_stat_log
 
-        rd_frame['matrix'][rd_frame['matrix'] > data_stat["rd_max_val"]] = data_stat["rd_max_val"]
-        rd_frame['matrix'][rd_frame['matrix'] < data_stat["rd_min_val"]] = data_stat["rd_min_val"]
-        
-        ra_frame['matrix'][ra_frame['matrix'] > data_stat["ra_max_val"]] = data_stat["ra_max_val"]
-        ra_frame['matrix'][ra_frame['matrix'] < data_stat["ra_min_val"]] = data_stat["ra_min_val"]
-        
-        ad_frame['matrix'][ad_frame['matrix'] > data_stat["ad_max_val"]] = data_stat["ad_max_val"]
-        ad_frame['matrix'][ad_frame['matrix'] < data_stat["ad_min_val"]] = data_stat["ad_min_val"]
+        if (data_stat is not None):
+            rd_frame['matrix'][rd_frame['matrix'] > data_stat["rd_max_val"]] = data_stat["rd_max_val"]
+            rd_frame['matrix'][rd_frame['matrix'] < data_stat["rd_min_val"]] = data_stat["rd_min_val"]
+            
+            ra_frame['matrix'][ra_frame['matrix'] > data_stat["ra_max_val"]] = data_stat["ra_max_val"]
+            ra_frame['matrix'][ra_frame['matrix'] < data_stat["ra_min_val"]] = data_stat["ra_min_val"]
+            
+            ad_frame['matrix'][ad_frame['matrix'] > data_stat["ad_max_val"]] = data_stat["ad_max_val"]
+            ad_frame['matrix'][ad_frame['matrix'] < data_stat["ad_min_val"]] = data_stat["ad_min_val"]
 
         frame = {'rd_matrix': rd_frame['matrix'], 'rd_mask': rd_frame['mask'],
                  'ra_matrix': ra_frame['matrix'], 'ra_mask': ra_frame['mask'],
@@ -524,7 +526,7 @@ class AngleShift():
         shape = matrix.shape
 
         # TODO: hard code here
-        shift_angle = -40
+        # shift_angle = -40
 
         # for i in range(matrix.shape[0]):
         #     matrix[i] = np.roll(matrix[i], shift_angle, 1)
