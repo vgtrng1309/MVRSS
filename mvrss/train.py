@@ -60,7 +60,11 @@ def main():
                       n_frames=data['cfg']['nb_input_channels'])
 
     if cp_path is not None:
-        checkpoint = torch.load(cp_path)
+        if (".pt" in cp_path):
+            ckpt_type = "pt"
+        elif (".ckpt" in cp_path):
+            ckpt_type = "ckpt"
+        checkpoint = torch.load(cp_path, map_location=torch.device('cpu'))
         print('loading checkpoint')
     else:
         checkpoint = None
@@ -71,9 +75,9 @@ def main():
 
 
     if cfg['model'] == 'mvnet':
-        Model(net, data, store_checkpoints = store_checkpoints, checkpoint = checkpoint).train(add_temp=False)
+        Model(net, data, store_checkpoints = store_checkpoints, checkpoint = checkpoint, ckpt_type=ckpt_type).train(add_temp=False)
     else:
-        Model(net, data, store_checkpoints = store_checkpoints, checkpoint = checkpoint).train(add_temp=True)
+        Model(net, data, store_checkpoints = store_checkpoints, checkpoint = checkpoint, ckpt_type=ckpt_type).train(add_temp=True)
 
 if __name__ == '__main__':
     main()

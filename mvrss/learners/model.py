@@ -27,11 +27,12 @@ class Model(nn.Module):
         Parameters and configurations for training
     """
 
-    def __init__(self, net, data, store_checkpoints, checkpoint = None):
+    def __init__(self, net, data, store_checkpoints, checkpoint = None, ckpt_type = None):
         super().__init__()
         self.net = net
         self.store_checkpoints = store_checkpoints
         self.checkpoint = checkpoint
+        self.ckpt_type = ckpt_type
         self.cfg = data['cfg']
         self.use_ad = self.cfg['use_ad']
         self.paths = data['paths']
@@ -95,16 +96,26 @@ class Model(nn.Module):
         self.net.to(self.device)
         
         if self.checkpoint is not None:
-            self.net.load_state_dict(self.checkpoint['model'])
-            optimizer.load_state_dict(self.checkpoint['optimizer'])
-            scheduler.load_state_dict(self.checkpoint['scheduler'])
-            iteration = self.checkpoint['iteration']
-            epoch_start = self.checkpoint['epoch']
-            best_test_miou = self.checkpoint['best_test_miou']
-            best_val_miou = self.checkpoint['best_val_miou']
-            epoch_of_best = self.checkpoint['epoch_of_best']
-            # val_flag = 1
-            del self.checkpoint
+            if self.ckpt_type == "ckpt":
+                self.net.load_state_dict(self.checkpoint['model'])
+                optimizer.load_state_dict(self.checkpoint['optimizer'])
+                scheduler.load_state_dict(self.checkpoint['scheduler'])
+                iteration = self.checkpoint['iteration']
+                epoch_start = self.checkpoint['epoch']
+                best_test_miou = self.checkpoint['best_test_miou']
+                best_val_miou = self.checkpoint['best_val_miou']
+                epoch_of_best = self.checkpoint['epoch_of_best']
+                # val_flag = 1
+                del self.checkpoint
+            elif self.ckpt_type == "pt":
+                print(self.checkpoint.keys())
+                self.net.load_state_dict(self.checkpoint)
+                iteration = 0
+                best_val_miou = 0
+                epoch_start = 0
+                # val_flag = 0
+                best_test_miou = 0
+                epoch_of_best = 0
         else:
             self.net.apply(self._init_weights)
             iteration = 0
