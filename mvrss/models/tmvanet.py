@@ -127,8 +127,8 @@ class EncodingBranch(nn.Module):
             x2_down = self.max_pool(x2)
 
         x3 = self.single_conv_block1_1x1(x2_down)
-        # return input of ASPP block + latent features
-        return x2_down, x3
+        # return output of 2nd conv block + input of ASPP block + latent features
+        return x2, x2_down, x3
 
 
 class TMVANet(nn.Module):
@@ -186,9 +186,9 @@ class TMVANet(nn.Module):
 
     def forward(self, x_rd, x_ra, x_ad):
         # Backbone
-        ra_features, ra_latent = self.ra_encoding_branch(x_ra)
-        rd_features, rd_latent = self.rd_encoding_branch(x_rd)
-        ad_features, ad_latent = self.ad_encoding_branch(x_ad)
+        ra_2nd_layers, ra_features, ra_latent = self.ra_encoding_branch(x_ra)
+        rd_2nd_layers, rd_features, rd_latent = self.rd_encoding_branch(x_rd)
+        _, ad_features, ad_latent = self.ad_encoding_branch(x_ad)
 
         # ASPP blocks
         x1_rd = self.rd_aspp_block(rd_features)
@@ -211,6 +211,12 @@ class TMVANet(nn.Module):
         # Parallel decoding branches with upconvs
         x5_rd = self.rd_upconv1(x4_rd)
         x5_ra = self.ra_upconv1(x4_ra)
+
+        # TODO: Skip connection is here
+        x5_rd = rd_2nd_layers + x5_rd
+        x5_ra = ra_2nd_layers + x5_ra
+
+        # Perform double conv block
         x6_rd = self.rd_double_conv_block1(x5_rd)
         x6_ra = self.ra_double_conv_block1(x5_ra)
 
