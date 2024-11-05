@@ -163,12 +163,12 @@ class CarradaDataset(Dataset):
 
         trans_range=0
         trans_angle=0
-        if np.random.uniform(0, 1) > 0.5:
+        if np.random.uniform(0, 1) > 0.3:
             while (trans_range == 0):
-                trans_range=np.random.randint(-20,20,1)[0]
-        if np.random.uniform(0, 1) > 0.5:
+                trans_range=np.random.randint(-20,30,1)[0]
+        if np.random.uniform(0, 1) > 0.3:
             while (trans_angle == 0):
-                trans_angle=np.random.randint(-10,10,1)[0]
+                trans_angle=np.random.randint(-30,30,1)[0]
         # trans_range=-1
         # trans_angle=-1
 
@@ -225,21 +225,19 @@ class CarradaDataset(Dataset):
             ra_frame['matrix'] = 10.0 * np.log10(ra_frame['matrix'])
             ad_frame['matrix'] = 10.0 * np.log10(ad_frame['matrix'])
         
-        data_stat = None
         if (self.norm_type == "tvt_raw"):
             data_stat = data_stat_raw
         elif (self.norm_type == "tvt_log"):
             data_stat = data_stat_log
 
-        if (data_stat is not None):
-            rd_frame['matrix'][rd_frame['matrix'] > data_stat["rd_max_val"]] = data_stat["rd_max_val"]
-            rd_frame['matrix'][rd_frame['matrix'] < data_stat["rd_min_val"]] = data_stat["rd_min_val"]
-            
-            ra_frame['matrix'][ra_frame['matrix'] > data_stat["ra_max_val"]] = data_stat["ra_max_val"]
-            ra_frame['matrix'][ra_frame['matrix'] < data_stat["ra_min_val"]] = data_stat["ra_min_val"]
-            
-            ad_frame['matrix'][ad_frame['matrix'] > data_stat["ad_max_val"]] = data_stat["ad_max_val"]
-            ad_frame['matrix'][ad_frame['matrix'] < data_stat["ad_min_val"]] = data_stat["ad_min_val"]
+        rd_frame['matrix'][rd_frame['matrix'] > data_stat["rd_max_val"]] = data_stat["rd_max_val"]
+        rd_frame['matrix'][rd_frame['matrix'] < data_stat["rd_min_val"]] = data_stat["rd_min_val"]
+        
+        ra_frame['matrix'][ra_frame['matrix'] > data_stat["ra_max_val"]] = data_stat["ra_max_val"]
+        ra_frame['matrix'][ra_frame['matrix'] < data_stat["ra_min_val"]] = data_stat["ra_min_val"]
+        
+        ad_frame['matrix'][ad_frame['matrix'] > data_stat["ad_max_val"]] = data_stat["ad_max_val"]
+        ad_frame['matrix'][ad_frame['matrix'] < data_stat["ad_min_val"]] = data_stat["ad_min_val"]
 
         frame = {'rd_matrix': rd_frame['matrix'], 'rd_mask': rd_frame['mask'],
                  'ra_matrix': ra_frame['matrix'], 'ra_mask': ra_frame['mask'],
@@ -379,8 +377,8 @@ class RangeShift:
         else:
             shift_range = trans_range
         shape = matrix.shape
-        # # TODO: hard code here
-        # shift_range = 20
+        # TODO: hard code here
+        # shift_range = -40
 
         if (view == "ra"):
             gene_noise_data = interpolation(matrix, [abs(shift_range), radar_configs["ramap_asize"]], axis=1)
@@ -444,30 +442,27 @@ class AngleShift():
         self.max_compen_mag = 2.0
         print(self.angle_factor)
         self.is_plot = False
-        if (False):
-            compen_mag = np.divide(self.angle_factor[30:256], 
-                                   self.angle_factor[0:226])
-        else:
-            compen_mag = np.divide(self.angle_factor[0:246],
-                                   self.angle_factor[10:256])
 
-        delta_compen_mag = compen_mag.copy()
-        delta_compen_mag[1:] = compen_mag[1:] - compen_mag[:-1]
-        indices = np.argwhere(delta_compen_mag > 0.05)
-        for indice in indices:
-            offset = 1
-            while True:
-                if (indice-offset >= 0 and (indice-offset) not in indices):
-                    compen_mag[indice] = compen_mag[indice-offset]
-                    break
-                elif (indice+offset < compen_mag.shape[0] and (indice+offset) not in indices):
-                    compen_mag[indice] = compen_mag[indice+offset]
-                    break
-                offset += 1
-        # plt.plot(np.arange(0, self.angle_factor.shape[0], 1), self.angle_factor)
+        # compen_mag = np.divide(self.angle_factor[0:216],
+        #                        self.angle_factor[40:256])
+
+        # delta_compen_mag = compen_mag.copy()
+        # delta_compen_mag[1:] = compen_mag[1:] - compen_mag[:-1]
+        # indices = np.argwhere(delta_compen_mag > 0.075)
+        # for indice in indices:
+        #     offset = 1
+        #     while True:
+        #         if (indice-offset >= 0 and (indice-offset) not in indices):
+        #             compen_mag[indice] = compen_mag[indice-offset]
+        #             break
+        #         elif (indice+offset < compen_mag.shape[0] and (indice+offset) not in indices):
+        #             compen_mag[indice] = compen_mag[indice+offset]
+        #             break
+        #         offset += 1
+        # # plt.plot(np.arange(0, self.angle_factor.shape[0], 1), self.angle_factor)
         # plt.plot(np.arange(0, compen_mag.shape[0], 1), compen_mag)
-        # plt.plot(np.arange(0, compen_mag.shape[0], 1), delta_compen_mag)
-        plt.show()
+        # # plt.plot(np.arange(0, compen_mag.shape[0], 1), delta_compen_mag)
+        # plt.show()
 
     def log2num(self, values):
         return 10.0**(values/10.0)
@@ -500,9 +495,9 @@ class AngleShift():
         factor_db[abs_angle_0_12] = 10.85 - (10.85-10.5)*(abs_angle_grid[abs_angle_0_12]-0) / (12-0)
         factor = self.log2num(factor_db)
         
-        print(factor)
-        plt.plot(np.linspace(-90.0, 90.0, 256), factor)
-        plt.show()
+        # print(factor)
+        # plt.plot(np.arange(0, factor.shape[0], 1), factor)
+        # plt.show()
         return factor
 
     def __call__(self, frame, trans_angle, view):
@@ -548,7 +543,6 @@ class AngleShift():
         #     self.is_plot = True
         #     plt.figure()
         #     plt.plot(np.arange(0, compen_mag.shape[0], 1), compen_mag)
-        print(shift_angle)
         shift_angle = abs(shift_angle)
         if (is_positive_shift):         
             compen_mag = np.divide(self.angle_factor[shift_angle:shape[2]], 
@@ -584,10 +578,10 @@ class AngleShift():
 
         if (is_positive_shift):
             matrix[:, :, shift_angle:shape[2]] = matrix[:, :, 0:shape[2]-shift_angle] * compen_mag
-            # if (view == "ra"):
-            #     gene_noise_data = interpolation(matrix, [radar_configs["ramap_rsize"], abs(shift_angle)], axis=2)
-            # else:
-            #     gene_noise_data = interpolation(matrix, [radar_configs["ramap_vsize"], abs(shift_angle)], axis=2) 
+            if (view == "ra"):
+                gene_noise_data = interpolation(matrix, [radar_configs["ramap_rsize"], abs(shift_angle)], axis=2)
+            else:
+                gene_noise_data = interpolation(matrix, [radar_configs["ramap_vsize"], abs(shift_angle)], axis=2) 
             
             matrix[:, :, 0:shift_angle] = gene_noise_data
             
