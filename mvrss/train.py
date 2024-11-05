@@ -59,6 +59,7 @@ def main():
         net = TMVANet(n_classes=data['cfg']['nb_classes'],
                       n_frames=data['cfg']['nb_input_channels'])
 
+    ckpt_type = None
     if cp_path is not None:
         if (".pt" in cp_path):
             ckpt_type = "pt"

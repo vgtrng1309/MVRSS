@@ -267,7 +267,7 @@ class Model(nn.Module):
                     'epoch_of_best': epoch_of_best
                     
                 }
-                save_model_path = '%s/epoch_%02d_final.pt' % (self.store_checkpoints, epoch+epoch_start + 1)
+                save_model_path = '%s/epoch_%02d_final.ckpt' % (self.store_checkpoints, epoch+epoch_start + 1)
                 torch.save(status_dict, save_model_path)
             
 
@@ -343,8 +343,8 @@ class Model(nn.Module):
                     'best_test_miou': best_test_miou,
                     'best_val_miou': best_val_miou,
                     'epoch_of_best': epoch_of_best
-                }
-                    save_model_path = '%s/max_epoch_%02d_final.pt' % (self.store_checkpoints, epoch+epoch_start + 1)
+                    }
+                    save_model_path = '%s/max_epoch_%02d_final.ckpt' % (self.store_checkpoints, epoch+epoch_start + 1)
                     torch.save(status_dict, save_model_path)
                     print('saving this checkpoint at', save_model_path)
 
