@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from mvrss.models.adaptive_directional_attention import ADA
+from mvrss.models.single_axial_attention import AxialImageTransformer
 
 
 class DoubleConvBlock(nn.Module):
@@ -113,10 +114,11 @@ class EncodingBranch(nn.Module):
 
 
 class TransRad(nn.Module):
-    def __init__(self, n_classes, n_frames, deform_k = [3, 3, 3, 3, 3, 3, 3, 3], depth = 8, channels = 64):
+    def __init__(self, n_classes, n_frames, deform_k = [3, 3, 3, 3, 3, 3, 3, 3], depth = 8, channels = 64, use_ait = True):
         super().__init__()
         self.n_classes = n_classes
         self.n_frames = n_frames
+        self.use_ait = use_ait
         self.rd_encoding_branch = EncodingBranch('range_doppler', k_size = (n_frames//2 + 1))
         self.ra_encoding_branch = EncodingBranch('range_angle', k_size = (n_frames//2 + 1))
         self.ad_encoding_branch = EncodingBranch('angle_doppler', k_size = (n_frames//2 + 1))
@@ -124,6 +126,8 @@ class TransRad(nn.Module):
         self.pre_trans1 = ConvBlock(128*3,(128*3)//2,1,0,1)
         self.pre_trans2 = ConvBlock((128*3)//2,channels,1,0,1)
         self.ADA = ADA(dim=channels, depth = depth, deform_k = deform_k)
+        self.AIT_ra = AxialImageTransformer(dim=128, depth=depth, view="ra")
+        self.AIT_ad = AxialImageTransformer(dim=128, depth=depth, view="ad")
         # Decoding
         self.rd_single_conv_block2_1x1 = ConvBlock(in_ch=channels, out_ch=128, k_size=1, pad=0, dil=1)
         self.ra_single_conv_block2_1x1 = ConvBlock(in_ch=channels, out_ch=128, k_size=1, pad=0, dil=1)
@@ -147,12 +151,13 @@ class TransRad(nn.Module):
         self.rd_final = nn.Conv2d(in_channels=128, out_channels=n_classes, kernel_size=1)
         self.ra_final = nn.Conv2d(in_channels=128, out_channels=n_classes, kernel_size=1)
 
-
     def forward(self, x_rd, x_ra, x_ad):
         ra_latent = self.ra_encoding_branch(x_ra)
         rd_latent = self.rd_encoding_branch(x_rd)
         ad_latent = self.ad_encoding_branch(x_ad)
-
+        if (self.use_ait):
+            ra_latent = self.AIT_ra(ra_latent)
+            ad_latent = self.AIT_ad(ad_latent)
 
         x3 = torch.cat((rd_latent, ra_latent, ad_latent), 1)
         x3 = self.pre_trans2(self.pre_trans1(x3))

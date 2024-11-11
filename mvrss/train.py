@@ -54,7 +54,8 @@ def main():
                       n_frames=data['cfg']['nb_input_channels'],
                       depth = data['cfg']['depth'],
                       channels = data['cfg']['channels'],
-                      deform_k = data['cfg']['deform_k'])
+                      deform_k = data['cfg']['deform_k'],
+                      use_ait=cfg['use_ait'])
     else:
         net = TMVANet(n_classes=data['cfg']['nb_classes'],
                       n_frames=data['cfg']['nb_input_channels'])
@@ -71,7 +72,6 @@ def main():
         checkpoint = None
 
     print('Number of trainable parameters in the model: %s' % str(count_params(net)))
-    print(net)
     print('model name is:', data['cfg']['unique'])
 
 
